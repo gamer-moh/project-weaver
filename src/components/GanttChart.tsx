@@ -1,23 +1,86 @@
-import { useMemo, useRef } from 'react';
-import { Task, diffDays, addDays } from '@/lib/scheduler';
+import { useMemo } from 'react';
+import { Task, diffDays, addDays, RelationType } from '@/lib/scheduler';
 
 interface GanttChartProps {
   tasks: Task[];
 }
 
-const ROW_HEIGHT = 32;
+const ROW_HEIGHT = 36;
 const HEADER_HEIGHT = 48;
 const DAY_WIDTH = 28;
-const BAR_HEIGHT = 16;
+const BAR_HEIGHT = 18;
 const BAR_MARGIN = (ROW_HEIGHT - BAR_HEIGHT) / 2;
+const ARROW_GAP = 10;
+
+interface ArrowPath {
+  d: string;
+  isCritical: boolean;
+  type: RelationType;
+}
+
+function buildArrowPath(
+  fromX: number, fromY: number,
+  toX: number, toY: number,
+  type: RelationType,
+  predBarStartX: number, predBarEndX: number,
+  succBarStartX: number, succBarEndX: number,
+): string {
+  // Professional orthogonal routing
+  const dropDown = 12;
+  const vertGap = 6;
+
+  if (type === 'FS') {
+    // From pred end → down → horizontal → down to succ start
+    const exitX = fromX;
+    const entryX = toX;
+    if (fromY < toY) {
+      const midY = fromY + dropDown;
+      if (exitX > entryX + ARROW_GAP) {
+        // Pred ends after succ starts - need to route around
+        return `M${exitX},${fromY} L${exitX + ARROW_GAP},${fromY} L${exitX + ARROW_GAP},${midY} L${entryX},${midY} L${entryX},${toY}`;
+      }
+      return `M${exitX},${fromY} L${exitX + ARROW_GAP},${fromY} L${exitX + ARROW_GAP},${midY} L${entryX},${midY} L${entryX},${toY}`;
+    } else {
+      const midY = toY - dropDown;
+      return `M${exitX},${fromY} L${exitX + ARROW_GAP},${fromY} L${exitX + ARROW_GAP},${midY} L${entryX},${midY} L${entryX},${toY}`;
+    }
+  }
+
+  if (type === 'SS') {
+    // From pred start → left → down → to succ start
+    const exitX = fromX;
+    const entryX = toX;
+    const leftX = Math.min(exitX, entryX) - ARROW_GAP;
+    return `M${exitX},${fromY} L${leftX},${fromY} L${leftX},${toY} L${entryX},${toY}`;
+  }
+
+  if (type === 'FF') {
+    // From pred end → right → down → to succ end
+    const exitX = fromX;
+    const entryX = toX;
+    const rightX = Math.max(exitX, entryX) + ARROW_GAP;
+    return `M${exitX},${fromY} L${rightX},${fromY} L${rightX},${toY} L${entryX},${toY}`;
+  }
+
+  if (type === 'SF') {
+    // From pred start → left → down → to succ end
+    const exitX = fromX;
+    const entryX = toX;
+    if (exitX > entryX) {
+      const midY = (fromY + toY) / 2;
+      return `M${exitX},${fromY} L${exitX - ARROW_GAP},${fromY} L${exitX - ARROW_GAP},${midY} L${entryX + ARROW_GAP},${midY} L${entryX + ARROW_GAP},${toY} L${entryX},${toY}`;
+    }
+    return `M${exitX},${fromY} L${exitX - ARROW_GAP},${fromY} L${exitX - ARROW_GAP},${toY} L${entryX},${toY}`;
+  }
+
+  return `M${fromX},${fromY} L${toX},${toY}`;
+}
 
 export function GanttChart({ tasks }: GanttChartProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const { projectStart, projectEnd, totalDays, dates } = useMemo(() => {
+  const { projectStart, totalDays, dates } = useMemo(() => {
     if (tasks.length === 0) {
-      const today = new Date();
-      return { projectStart: today, projectEnd: today, totalDays: 30, dates: [] };
+      const d = new Date(2026, 3, 13);
+      return { projectStart: d, totalDays: 30, dates: [] };
     }
 
     let minDate = new Date(tasks[0].startDate);
@@ -27,7 +90,6 @@ export function GanttChart({ tasks }: GanttChartProps) {
       if (t.endDate > maxDate) maxDate = new Date(t.endDate);
     }
 
-    // Add padding
     const pStart = addDays(minDate, -2);
     const pEnd = addDays(maxDate, 5);
     const total = diffDays(pEnd, pStart) + 1;
@@ -37,18 +99,41 @@ export function GanttChart({ tasks }: GanttChartProps) {
       dts.push(addDays(pStart, i));
     }
 
-    return { projectStart: pStart, projectEnd: pEnd, totalDays: total, dates: dts };
+    return { projectStart: pStart, totalDays: total, dates: dts };
   }, [tasks]);
 
   const chartWidth = totalDays * DAY_WIDTH;
   const chartHeight = HEADER_HEIGHT + tasks.length * ROW_HEIGHT;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayX = diffDays(today, projectStart) * DAY_WIDTH;
 
-  // Group dates by month
+  // RTL: flip X axis. Day 0 is on the RIGHT side.
+  const rtlX = (dayOffset: number) => chartWidth - (dayOffset + 1) * DAY_WIDTH;
+  const getBarX = (date: Date) => {
+    const dayOff = diffDays(date, projectStart);
+    // Bar starts at rtlX of (dayOff + duration - 1) and ends at rtlX of dayOff
+    return chartWidth - (dayOff + 1) * DAY_WIDTH;
+  };
+  const getBarXEnd = (date: Date) => {
+    const dayOff = diffDays(date, projectStart);
+    return chartWidth - dayOff * DAY_WIDTH;
+  };
+  const getBarStartEdge = (task: Task) => {
+    // In RTL, "start" edge is on the RIGHT
+    return getBarXEnd(task.startDate);
+  };
+  const getBarEndEdge = (task: Task) => {
+    // In RTL, "end/finish" edge is on the LEFT
+    return getBarX(task.endDate);
+  };
+  const getBarW = (start: Date, end: Date) => (diffDays(end, start) + 1) * DAY_WIDTH;
+
+  // Today line
+  const todayDate = new Date(2026, 3, 13); // Fixed to prevent hydration mismatch
+  const todayDayOff = diffDays(todayDate, projectStart);
+  const todayXPos = chartWidth - (todayDayOff + 0.5) * DAY_WIDTH;
+
+  // Months (RTL)
   const months = useMemo(() => {
-    const m: Array<{ label: string; startX: number; width: number }> = [];
+    const m: Array<{ label: string; x: number; width: number }> = [];
     let currentMonth = '';
     let startIdx = 0;
 
@@ -56,10 +141,11 @@ export function GanttChart({ tasks }: GanttChartProps) {
       const key = `${d.getFullYear()}-${d.getMonth()}`;
       if (key !== currentMonth) {
         if (currentMonth) {
+          const w = (i - startIdx) * DAY_WIDTH;
           m.push({
-            label: dates[startIdx].toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-            startX: startIdx * DAY_WIDTH,
-            width: (i - startIdx) * DAY_WIDTH,
+            label: dates[startIdx].toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' }),
+            x: chartWidth - i * DAY_WIDTH,
+            width: w,
           });
         }
         currentMonth = key;
@@ -67,25 +153,20 @@ export function GanttChart({ tasks }: GanttChartProps) {
       }
     });
     if (dates.length > 0) {
+      const w = (dates.length - startIdx) * DAY_WIDTH;
       m.push({
-        label: dates[startIdx].toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-        startX: startIdx * DAY_WIDTH,
-        width: (dates.length - startIdx) * DAY_WIDTH,
+        label: dates[startIdx].toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' }),
+        x: chartWidth - dates.length * DAY_WIDTH,
+        width: w,
       });
     }
     return m;
-  }, [dates]);
+  }, [dates, chartWidth]);
 
-  const getBarX = (date: Date) => diffDays(date, projectStart) * DAY_WIDTH;
-  const getBarWidth = (start: Date, end: Date) => (diffDays(end, start) + 1) * DAY_WIDTH;
-
-  // Calculate dependency arrows
-  const arrows = useMemo(() => {
+  // Dependency arrows
+  const arrows = useMemo((): ArrowPath[] => {
     const taskMap = new Map(tasks.map((t, i) => [t.id, { task: t, index: i }]));
-    const lines: Array<{
-      points: string;
-      isCritical: boolean;
-    }> = [];
+    const result: ArrowPath[] = [];
 
     for (let i = 0; i < tasks.length; i++) {
       const task = tasks[i];
@@ -93,92 +174,109 @@ export function GanttChart({ tasks }: GanttChartProps) {
         const predInfo = taskMap.get(pred.taskId);
         if (!predInfo) continue;
 
-        const predY = HEADER_HEIGHT + predInfo.index * ROW_HEIGHT + ROW_HEIGHT / 2;
-        const succY = HEADER_HEIGHT + i * ROW_HEIGHT + ROW_HEIGHT / 2;
-        const predStartX = getBarX(predInfo.task.startDate);
-        const predEndX = predStartX + getBarWidth(predInfo.task.startDate, predInfo.task.endDate);
-        const succStartX = getBarX(task.startDate);
-        const succEndX = succStartX + getBarWidth(task.startDate, task.endDate);
+        const predTask = predInfo.task;
+        const predRow = predInfo.index;
+        const succRow = i;
+
+        const predY = HEADER_HEIGHT + predRow * ROW_HEIGHT + ROW_HEIGHT / 2;
+        const succY = HEADER_HEIGHT + succRow * ROW_HEIGHT + ROW_HEIGHT / 2;
+
+        // In RTL: start edge = right, end/finish edge = left
+        const predStartEdge = getBarStartEdge(predTask); // right edge
+        const predEndEdge = getBarEndEdge(predTask);     // left edge
+        const succStartEdge = getBarStartEdge(task);
+        const succEndEdge = getBarEndEdge(task);
+
+        const predBarSX = getBarEndEdge(predTask);
+        const predBarEX = getBarStartEdge(predTask);
+        const succBarSX = getBarEndEdge(task);
+        const succBarEX = getBarStartEdge(task);
 
         let fromX: number, toX: number;
-        const midGap = 8;
 
         switch (pred.type) {
-          case 'FS':
-            fromX = predEndX;
-            toX = succStartX;
+          case 'FS': // from pred finish (left) to succ start (right)
+            fromX = predEndEdge;
+            toX = succStartEdge;
             break;
-          case 'SS':
-            fromX = predStartX;
-            toX = succStartX;
+          case 'SS': // from pred start (right) to succ start (right)
+            fromX = predStartEdge;
+            toX = succStartEdge;
             break;
-          case 'FF':
-            fromX = predEndX;
-            toX = succEndX;
+          case 'FF': // from pred finish (left) to succ finish (left)
+            fromX = predEndEdge;
+            toX = succEndEdge;
             break;
-          case 'SF':
-            fromX = predStartX;
-            toX = succEndX;
+          case 'SF': // from pred start (right) to succ finish (left)
+            fromX = predStartEdge;
+            toX = succEndEdge;
             break;
         }
 
-        // Simple L-shaped path
-        const midY = (predY + succY) / 2;
-        const path = `${fromX},${predY} ${fromX + midGap},${predY} ${fromX + midGap},${midY} ${toX - midGap},${midY} ${toX - midGap},${succY} ${toX},${succY}`;
+        const d = buildArrowPathRTL(
+          fromX, predY, toX, succY,
+          pred.type,
+          predBarSX, predBarEX,
+          succBarSX, succBarEX,
+        );
 
-        lines.push({
-          points: path,
-          isCritical: predInfo.task.isCritical && task.isCritical,
+        result.push({
+          d,
+          isCritical: predTask.isCritical && task.isCritical,
+          type: pred.type,
         });
       }
     }
 
-    return lines;
-  }, [tasks, projectStart]);
+    return result;
+  }, [tasks, projectStart, chartWidth]);
 
   return (
-    <div ref={containerRef} className="h-full overflow-auto bg-card">
-      <svg width={chartWidth} height={chartHeight} className="min-w-full">
+    <div className="h-full overflow-auto bg-card" dir="ltr">
+      <svg width={chartWidth} height={Math.max(chartHeight, 300)} className="min-w-full">
+        <defs>
+          <marker id="arrow-normal" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
+            <path d="M0,0 L6,2.5 L0,5 L1.5,2.5 Z" fill="oklch(0.6 0.02 250 / 0.6)" />
+          </marker>
+          <marker id="arrow-critical" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
+            <path d="M0,0 L6,2.5 L0,5 L1.5,2.5 Z" fill="oklch(0.65 0.22 25)" />
+          </marker>
+        </defs>
+
         {/* Month headers */}
         {months.map((m, i) => (
           <g key={i}>
-            <rect x={m.startX} y={0} width={m.width} height={24} className="fill-secondary/80" />
-            <text x={m.startX + 6} y={16} className="fill-muted-foreground text-[10px] font-medium">
+            <rect x={m.x} y={0} width={m.width} height={24} className="fill-secondary/80" />
+            <text
+              x={m.x + m.width - 8}
+              y={16}
+              textAnchor="end"
+              className="fill-muted-foreground text-[10px] font-medium"
+              style={{ fontFamily: 'Cairo, sans-serif' }}
+            >
               {m.label}
             </text>
           </g>
         ))}
 
-        {/* Day headers */}
+        {/* Day columns (RTL) */}
         {dates.map((d, i) => {
           const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+          const x = chartWidth - (i + 1) * DAY_WIDTH;
           return (
             <g key={i}>
               {isWeekend && (
-                <rect
-                  x={i * DAY_WIDTH}
-                  y={24}
-                  width={DAY_WIDTH}
-                  height={chartHeight}
-                  className="fill-secondary/30"
-                />
+                <rect x={x} y={24} width={DAY_WIDTH} height={chartHeight} className="fill-secondary/30" />
               )}
               <text
-                x={i * DAY_WIDTH + DAY_WIDTH / 2}
+                x={x + DAY_WIDTH / 2}
                 y={40}
                 textAnchor="middle"
                 className={`text-[9px] ${isWeekend ? 'fill-muted-foreground/50' : 'fill-muted-foreground'}`}
               >
                 {d.getDate()}
               </text>
-              <line
-                x1={i * DAY_WIDTH}
-                y1={24}
-                x2={i * DAY_WIDTH}
-                y2={chartHeight}
-                className="stroke-border/30"
-                strokeWidth={0.5}
-              />
+              <line x1={x} y1={24} x2={x} y2={chartHeight} className="stroke-border/30" strokeWidth={0.5} />
             </g>
           );
         })}
@@ -188,97 +286,128 @@ export function GanttChart({ tasks }: GanttChartProps) {
 
         {/* Row lines */}
         {tasks.map((_, i) => (
-          <line
-            key={i}
-            x1={0}
-            y1={HEADER_HEIGHT + (i + 1) * ROW_HEIGHT}
-            x2={chartWidth}
-            y2={HEADER_HEIGHT + (i + 1) * ROW_HEIGHT}
-            className="stroke-border/20"
-            strokeWidth={0.5}
-          />
+          <line key={i} x1={0} y1={HEADER_HEIGHT + (i + 1) * ROW_HEIGHT} x2={chartWidth} y2={HEADER_HEIGHT + (i + 1) * ROW_HEIGHT} className="stroke-border/20" strokeWidth={0.5} />
         ))}
 
         {/* Today line */}
-        {todayX > 0 && todayX < chartWidth && (
-          <line
-            x1={todayX}
-            y1={0}
-            x2={todayX}
-            y2={chartHeight}
-            className="stroke-gantt-today"
-            strokeWidth={1.5}
-            strokeDasharray="4 2"
-          />
+        {todayXPos > 0 && todayXPos < chartWidth && (
+          <line x1={todayXPos} y1={0} x2={todayXPos} y2={chartHeight} className="stroke-gantt-today" strokeWidth={1.5} strokeDasharray="4 2" />
         )}
 
-        {/* Dependency arrows */}
+        {/* Dependency arrows - drawn BEHIND bars */}
         {arrows.map((arrow, i) => (
-          <g key={`arrow-${i}`}>
-            <polyline
-              points={arrow.points}
-              fill="none"
-              className={arrow.isCritical ? 'stroke-critical-path' : 'stroke-muted-foreground/40'}
-              strokeWidth={1.5}
-              markerEnd={`url(#arrowhead${arrow.isCritical ? '-critical' : ''})`}
-            />
-          </g>
+          <path
+            key={`dep-${i}`}
+            d={arrow.d}
+            fill="none"
+            stroke={arrow.isCritical ? 'oklch(0.65 0.22 25)' : 'oklch(0.6 0.02 250 / 0.5)'}
+            strokeWidth={1.5}
+            strokeLinejoin="round"
+            markerEnd={`url(#arrow-${arrow.isCritical ? 'critical' : 'normal'})`}
+          />
         ))}
-
-        {/* Arrow markers */}
-        <defs>
-          <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" className="fill-muted-foreground/40" />
-          </marker>
-          <marker id="arrowhead-critical" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" className="fill-critical-path" />
-          </marker>
-        </defs>
 
         {/* Task bars */}
         {tasks.map((task, i) => {
-          const x = getBarX(task.startDate);
-          const w = getBarWidth(task.startDate, task.endDate);
+          const w = getBarW(task.startDate, task.endDate);
+          const barLeft = getBarEndEdge(task); // left edge in RTL
           const y = HEADER_HEIGHT + i * ROW_HEIGHT + BAR_MARGIN;
 
           return (
             <g key={task.id}>
-              {/* Bar background */}
+              {/* Shadow */}
               <rect
-                x={x}
+                x={barLeft}
+                y={y + 2}
+                width={w}
+                height={BAR_HEIGHT}
+                rx={4}
+                fill="black"
+                opacity={0.15}
+              />
+              {/* Bar */}
+              <rect
+                x={barLeft}
                 y={y}
                 width={w}
                 height={BAR_HEIGHT}
-                rx={3}
+                rx={4}
                 className={task.isCritical ? 'fill-gantt-bar-critical' : 'fill-gantt-bar'}
-                opacity={0.85}
+                opacity={0.9}
               />
-              {/* Progress fill */}
+              {/* Progress */}
               {task.progress > 0 && (
                 <rect
-                  x={x}
-                  y={y}
+                  x={barLeft + w - w * (task.progress / 100)}
+                  y={y + 2}
                   width={w * (task.progress / 100)}
-                  height={BAR_HEIGHT}
-                  rx={3}
+                  height={BAR_HEIGHT - 4}
+                  rx={2}
                   className={task.isCritical ? 'fill-critical-path' : 'fill-primary'}
-                  opacity={0.6}
+                  opacity={0.5}
                 />
               )}
-              {/* Task name on bar */}
-              {w > 60 && (
-                <text
-                  x={x + 6}
-                  y={y + BAR_HEIGHT / 2 + 3.5}
-                  className="fill-foreground text-[9px] font-medium"
-                >
-                  {task.name.length > w / 7 ? task.name.slice(0, Math.floor(w / 7)) + '…' : task.name}
-                </text>
-              )}
+              {/* Task name - positioned to the right of bar in RTL */}
+              <text
+                x={barLeft + w + 6}
+                y={y + BAR_HEIGHT / 2 + 4}
+                className="fill-muted-foreground text-[9px] font-medium"
+                style={{ fontFamily: 'Cairo, sans-serif' }}
+              >
+                {task.name}
+              </text>
             </g>
           );
         })}
       </svg>
     </div>
   );
+}
+
+/**
+ * Build professional orthogonal arrow path for RTL Gantt
+ * In RTL: start = right edge, finish = left edge
+ */
+function buildArrowPathRTL(
+  fromX: number, fromY: number,
+  toX: number, toY: number,
+  type: RelationType,
+  _predBarLeft: number, _predBarRight: number,
+  _succBarLeft: number, _succBarRight: number,
+): string {
+  const gap = ARROW_GAP;
+  const isDownward = toY > fromY;
+  const vertDir = isDownward ? 1 : -1;
+
+  switch (type) {
+    case 'FS': {
+      // From finish (left) → go left → down → right to start (right)
+      const exitX = fromX - gap;
+      if (toX <= fromX) {
+        // Succ starts after pred finishes (normal case in RTL)
+        const midY = fromY + (ROW_HEIGHT / 2 + 2) * vertDir;
+        return `M${fromX},${fromY} L${exitX},${fromY} L${exitX},${midY} L${toX + gap},${midY} L${toX + gap},${toY} L${toX},${toY}`;
+      } else {
+        // Overlap case
+        const midY = fromY + (ROW_HEIGHT / 2 + 2) * vertDir;
+        return `M${fromX},${fromY} L${exitX},${fromY} L${exitX},${midY} L${toX + gap},${midY} L${toX + gap},${toY} L${toX},${toY}`;
+      }
+    }
+    case 'SS': {
+      // Both from right edge
+      const rightX = Math.max(fromX, toX) + gap;
+      return `M${fromX},${fromY} L${rightX},${fromY} L${rightX},${toY} L${toX},${toY}`;
+    }
+    case 'FF': {
+      // Both from left edge
+      const leftX = Math.min(fromX, toX) - gap;
+      return `M${fromX},${fromY} L${leftX},${fromY} L${leftX},${toY} L${toX},${toY}`;
+    }
+    case 'SF': {
+      // From start (right) to finish (left)
+      const exitX = fromX + gap;
+      const midY = fromY + (ROW_HEIGHT / 2 + 2) * vertDir;
+      return `M${fromX},${fromY} L${exitX},${fromY} L${exitX},${midY} L${toX - gap},${midY} L${toX - gap},${toY} L${toX},${toY}`;
+    }
+  }
 }
