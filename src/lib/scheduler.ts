@@ -305,10 +305,12 @@ export function formatPredecessors(preds: Predecessor[], taskIds: string[]): str
  * Generate sample project data
  */
 export function generateSampleProject(): Task[] {
-  const baseDate = new Date();
-  baseDate.setHours(0, 0, 0, 0);
+  const baseDate = new Date(2026, 3, 13); // Fixed date to avoid hydration mismatch
 
-  const ids = Array.from({ length: 8 }, () => crypto.randomUUID());
+  const ids = [
+    'task-001', 'task-002', 'task-003', 'task-004',
+    'task-005', 'task-006', 'task-007', 'task-008',
+  ];
 
   const tasks: Task[] = [
     createTask({ id: ids[0], name: 'Project Initiation', startDate: baseDate, duration: 3, wbs: '1.1', predecessors: [] }),
