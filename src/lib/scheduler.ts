@@ -305,11 +305,26 @@ export function formatPredecessors(preds: Predecessor[], taskIds: string[]): str
  * Generate sample project data
  */
 export function generateSampleProject(): Task[] {
-  const baseDate = new Date();
-  baseDate.setHours(0, 0, 0, 0);
+  const baseDate = new Date(2026, 3, 13); // Fixed date to avoid hydration mismatch
 
-  const ids = Array.from({ length: 8 }, () => crypto.randomUUID());
+  const ids = [
+    'task-001', 'task-002', 'task-003', 'task-004',
+    'task-005', 'task-006', 'task-007', 'task-008',
+  ];
 
+  const tasks: Task[] = [
+    createTask({ id: ids[0], name: 'Project Initiation', startDate: baseDate, duration: 3, wbs: '1.1', predecessors: [] }),
+    createTask({ id: ids[1], name: 'Requirements Gathering', startDate: baseDate, duration: 5, wbs: '1.2', predecessors: [{ taskId: ids[0], type: 'FS', lag: 0 }] }),
+    createTask({ id: ids[2], name: 'System Design', startDate: baseDate, duration: 8, wbs: '2.1', predecessors: [{ taskId: ids[1], type: 'FS', lag: 0 }] }),
+    createTask({ id: ids[3], name: 'Database Development', startDate: baseDate, duration: 10, wbs: '2.2', predecessors: [{ taskId: ids[2], type: 'FS', lag: 0 }] }),
+    createTask({ id: ids[4], name: 'Frontend Development', startDate: baseDate, duration: 12, wbs: '2.3', predecessors: [{ taskId: ids[2], type: 'FS', lag: 0 }, { taskId: ids[3], type: 'SS', lag: 2 }] }),
+    createTask({ id: ids[5], name: 'Integration Testing', startDate: baseDate, duration: 5, wbs: '3.1', predecessors: [{ taskId: ids[3], type: 'FF', lag: 0 }, { taskId: ids[4], type: 'FS', lag: 0 }] }),
+    createTask({ id: ids[6], name: 'User Acceptance Testing', startDate: baseDate, duration: 4, wbs: '3.2', predecessors: [{ taskId: ids[5], type: 'FS', lag: 0 }] }),
+    createTask({ id: ids[7], name: 'Deployment & Go-Live', startDate: baseDate, duration: 2, wbs: '4.1', predecessors: [{ taskId: ids[6], type: 'FS', lag: 0 }] }),
+  ];
+
+  return calculateSchedule(tasks);
+}
   const tasks: Task[] = [
     createTask({ id: ids[0], name: 'Project Initiation', startDate: baseDate, duration: 3, wbs: '1.1', predecessors: [] }),
     createTask({ id: ids[1], name: 'Requirements Gathering', startDate: baseDate, duration: 5, wbs: '1.2', predecessors: [{ taskId: ids[0], type: 'FS', lag: 0 }] }),
