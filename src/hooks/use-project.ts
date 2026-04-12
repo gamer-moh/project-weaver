@@ -1,22 +1,16 @@
 import { useState, useCallback } from 'react';
 import {
   Task,
+  Predecessor,
   calculateSchedule,
   createTask,
   generateSampleProject,
-  parsePredecessors,
   addDays,
 } from '@/lib/scheduler';
 
 export function useProject() {
   const [tasks, setTasks] = useState<Task[]>(() => generateSampleProject());
-  const [projectName, setProjectName] = useState('Enterprise Software Development');
-
-  const recalculate = useCallback((updatedTasks: Task[]) => {
-    const scheduled = calculateSchedule(updatedTasks);
-    setTasks(scheduled);
-    return scheduled;
-  }, []);
+  const [projectName, setProjectName] = useState('مشروع تطوير برمجيات المؤسسة');
 
   const updateTask = useCallback((taskId: string, updates: Partial<Task>) => {
     setTasks(prev => {
@@ -34,10 +28,8 @@ export function useProject() {
     });
   }, []);
 
-  const updatePredecessors = useCallback((taskId: string, predStr: string) => {
+  const savePredecessors = useCallback((taskId: string, preds: Predecessor[]) => {
     setTasks(prev => {
-      const taskIds = prev.map(t => t.id);
-      const preds = parsePredecessors(predStr, taskIds);
       const updated = prev.map(t =>
         t.id === taskId ? { ...t, predecessors: preds } : t
       );
@@ -48,9 +40,9 @@ export function useProject() {
   const addTask = useCallback(() => {
     setTasks(prev => {
       const lastTask = prev[prev.length - 1];
-      const startDate = lastTask ? addDays(lastTask.endDate, 1) : new Date();
+      const startDate = lastTask ? addDays(lastTask.endDate, 1) : new Date(2026, 3, 13);
       const newTask = createTask({
-        name: `New Task ${prev.length + 1}`,
+        name: `مهمة جديدة ${prev.length + 1}`,
         startDate,
         duration: 5,
         wbs: `${prev.length + 1}`,
@@ -76,9 +68,8 @@ export function useProject() {
     projectName,
     setProjectName,
     updateTask,
-    updatePredecessors,
+    savePredecessors,
     addTask,
     removeTask,
-    recalculate,
   };
 }

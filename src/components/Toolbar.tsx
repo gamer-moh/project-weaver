@@ -28,10 +28,10 @@ export function Toolbar({
             className="bg-transparent text-foreground font-semibold text-sm outline-none border-b border-transparent hover:border-border focus:border-primary transition-colors px-1 py-0.5 min-w-[200px]"
           />
         </div>
-        <div className="flex items-center gap-3 text-[10px] text-muted-foreground uppercase tracking-wider">
-          <span>{taskCount} tasks</span>
+        <div className="flex items-center gap-3 text-[10px] text-muted-foreground tracking-wider">
+          <span>{taskCount} مهمة</span>
           <span className="w-px h-3 bg-border" />
-          <span className="text-critical-path">{criticalCount} critical</span>
+          <span className="text-critical-path">{criticalCount} حرجة</span>
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -40,14 +40,14 @@ export function Toolbar({
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-md transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
-          Add Task
+          إضافة مهمة
         </button>
         <button
           onClick={onExportPdf}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors"
         >
           <FileDown className="w-3.5 h-3.5" />
-          Export PDF
+          تحميل PDF
         </button>
       </div>
     </header>
