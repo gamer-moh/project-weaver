@@ -1,9 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { useState } from 'react';
 import { useProject } from '@/hooks/use-project';
 import { Toolbar } from '@/components/Toolbar';
 import { TaskTable } from '@/components/TaskTable';
 import { GanttChart } from '@/components/GanttChart';
-import { exportSchedulePdf } from '@/lib/pdf-export';
+import { PdfPreviewModal } from '@/components/PdfPreviewModal';
 
 export const Route = createFileRoute('/')({
   component: App,
@@ -26,6 +27,7 @@ function App() {
     removeTask,
   } = useProject();
 
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
   const criticalCount = tasks.filter(t => t.isCritical).length;
 
   return (
@@ -34,13 +36,12 @@ function App() {
         projectName={projectName}
         onProjectNameChange={setProjectName}
         onAddTask={addTask}
-        onExportPdf={() => exportSchedulePdf(tasks, projectName)}
+        onExportPdf={() => setShowPdfPreview(true)}
         taskCount={tasks.length}
         criticalCount={criticalCount}
       />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Task Table */}
         <div className="w-[680px] min-w-[480px] border-l border-border flex flex-col overflow-hidden">
           <TaskTable
             tasks={tasks}
@@ -50,14 +51,11 @@ function App() {
             onRemoveTask={removeTask}
           />
         </div>
-
-        {/* Gantt Chart */}
         <div className="flex-1 overflow-hidden">
           <GanttChart tasks={tasks} />
         </div>
       </div>
 
-      {/* Status bar */}
       <div className="flex items-center justify-between px-4 py-1 bg-card border-t border-border text-[10px] text-muted-foreground">
         <span>انقر نقرتين على الخلايا للتعديل • اضغط على الاعتمادات لفتح نافذة الربط</span>
         <div className="flex items-center gap-3">
@@ -72,6 +70,14 @@ function App() {
           </span>
         </div>
       </div>
+
+      {showPdfPreview && (
+        <PdfPreviewModal
+          tasks={tasks}
+          projectName={projectName}
+          onClose={() => setShowPdfPreview(false)}
+        />
+      )}
     </div>
   );
 }
