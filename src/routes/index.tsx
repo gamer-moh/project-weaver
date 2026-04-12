@@ -9,8 +9,8 @@ export const Route = createFileRoute('/')({
   component: App,
   head: () => ({
     meta: [
-      { title: 'ProjectFlow - Advanced Project Scheduling' },
-      { name: 'description', content: 'Enterprise-grade project management with CPM scheduling, Gantt charts, and dependency tracking.' },
+      { title: 'ProjectFlow - إدارة المشاريع الاحترافية' },
+      { name: 'description', content: 'أداة إدارة مشاريع احترافية مع جدولة CPM ومخطط غانت وتتبع العلاقات' },
     ],
   }),
 });
@@ -21,7 +21,7 @@ function App() {
     projectName,
     setProjectName,
     updateTask,
-    updatePredecessors,
+    savePredecessors,
     addTask,
     removeTask,
   } = useProject();
@@ -41,11 +41,11 @@ function App() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Task Table */}
-        <div className="w-[680px] min-w-[480px] border-r border-border flex flex-col overflow-hidden">
+        <div className="w-[680px] min-w-[480px] border-l border-border flex flex-col overflow-hidden">
           <TaskTable
             tasks={tasks}
             onUpdateTask={updateTask}
-            onUpdatePredecessors={updatePredecessors}
+            onSavePredecessors={savePredecessors}
             onAddTask={addTask}
             onRemoveTask={removeTask}
           />
@@ -59,16 +59,16 @@ function App() {
 
       {/* Status bar */}
       <div className="flex items-center justify-between px-4 py-1 bg-card border-t border-border text-[10px] text-muted-foreground">
-        <span>Double-click cells to edit • Predecessors format: 1FS, 2SS+3</span>
+        <span>انقر نقرتين على الخلايا للتعديل • اضغط على الاعتمادات لفتح نافذة الربط</span>
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-gantt-bar" /> Normal
+            <span className="w-2 h-2 rounded-full bg-gantt-bar" /> عادي
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-critical-path" /> Critical Path
+            <span className="w-2 h-2 rounded-full bg-critical-path" /> مسار حرج
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-0.5 h-3 bg-gantt-today" /> Today
+            <span className="w-0.5 h-3 bg-gantt-today" /> اليوم
           </span>
         </div>
       </div>
