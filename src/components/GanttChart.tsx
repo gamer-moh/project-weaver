@@ -230,7 +230,7 @@ export function GanttChart({ tasks }: GanttChartProps) {
                 {labelLines.map((line, lineIndex) => (
                   <text
                     key={`${task.id}-${lineIndex}`}
-                    x={bar.endX + 8}
+                    x={bar.endX + 10}
                     y={y + 10 + lineIndex * 10}
                     className="fill-muted-foreground text-[9px] font-medium"
                     style={{ fontFamily: 'Cairo, sans-serif' }}

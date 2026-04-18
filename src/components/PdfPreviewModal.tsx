@@ -4,6 +4,7 @@ import jsPDF from 'jspdf';
 import { FileDown, LoaderCircle, Settings, X } from 'lucide-react';
 import { Task, addDays, diffDays, formatDate, formatPredecessors } from '@/lib/scheduler';
 import { buildOrthogonalDependencyPath, getDependencyConnection, getTaskBarLayout } from '@/lib/gantt';
+import { CAIRO_FONT_BASE64 } from '@/lib/cairo-font';
 import type { ReportSettings } from '@/hooks/use-project';
 
 type PaperSize = 'a4' | 'a3';
@@ -13,6 +14,11 @@ type PaperSpec = {
   widthPx: number;
   heightPx: number;
   padding: number;
+};
+
+type ExportSandbox = {
+  iframe: HTMLIFrameElement;
+  wrapper: HTMLDivElement;
 };
 
 const PAPER_SPECS: Record<PaperSize, PaperSpec> = {
@@ -36,6 +42,9 @@ const PDF_COLORS = {
   today: '#16a34a',
 };
 
+const PDF_FONT_FAMILY = 'Cairo, sans-serif';
+const EMBEDDED_CAIRO = CAIRO_FONT_BASE64.replace(/\s+/g, '');
+
 interface PdfPreviewModalProps {
   tasks: Task[];
   projectName: string;
@@ -51,59 +60,145 @@ type PageProps = {
   reportSettings: ReportSettings;
 };
 
-async function waitForCaptureReady() {
-  if (typeof document !== 'undefined' && 'fonts' in document) {
-    await document.fonts.ready;
+async function waitForCaptureReady(doc: Document = document) {
+  if ('fonts' in doc) {
+    await doc.fonts.ready;
   }
   await new Promise<void>((resolve) => {
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
   });
 }
 
-async function captureElement(element: HTMLElement, widthPx: number, heightPx: number) {
-  const canvas = await html2canvas(element, {
-    backgroundColor: PDF_COLORS.page,
-    scale: 2,
-    useCORS: true,
-    allowTaint: true,
-    logging: false,
-    width: widthPx,
-    height: heightPx,
-    windowWidth: widthPx,
-    windowHeight: heightPx,
-    scrollX: 0,
-    scrollY: 0,
-    onclone: (clonedDocument) => {
-      clonedDocument.documentElement.style.background = PDF_COLORS.page;
-      clonedDocument.documentElement.style.color = PDF_COLORS.ink;
-      clonedDocument.body.style.margin = '0';
-      clonedDocument.body.style.background = PDF_COLORS.page;
-      clonedDocument.body.style.color = PDF_COLORS.ink;
+function sanitizeExportTree(node: Element) {
+  node.removeAttribute('class');
 
-      const isolateRoot = clonedDocument.querySelector('[data-pdf-isolate-root]') as HTMLElement | null;
-      if (isolateRoot) {
-        Array.from(clonedDocument.body.children).forEach((child) => {
-          if (child !== isolateRoot) child.remove();
-        });
+  if (node instanceof HTMLElement || node instanceof SVGElement) {
+    const style = node.style;
+    style.boxShadow = 'none';
+    style.filter = 'none';
+    style.backdropFilter = 'none';
+    style.transition = 'none';
+    style.animation = 'none';
+    style.backgroundImage = 'none';
+    style.fontFamily = PDF_FONT_FAMILY;
 
-        isolateRoot.style.all = 'initial';
-        isolateRoot.style.display = 'block';
-        isolateRoot.style.position = 'static';
-        isolateRoot.style.width = `${widthPx}px`;
-        isolateRoot.style.background = PDF_COLORS.page;
-        isolateRoot.style.color = PDF_COLORS.ink;
-        isolateRoot.style.fontFamily = 'Cairo, sans-serif';
-        isolateRoot.style.direction = 'rtl';
-        isolateRoot.style.boxSizing = 'border-box';
+    const colorProps = ['color', 'backgroundColor', 'borderColor', 'fill', 'stroke'] as const;
+    for (const prop of colorProps) {
+      const value = style[prop as keyof CSSStyleDeclaration];
+      if (typeof value === 'string' && /(oklch|color-mix|var\()/i.test(value)) {
+        style[prop as keyof CSSStyleDeclaration] = '';
       }
-    },
-  });
+    }
+  }
 
-  return canvas.toDataURL('image/png');
+  Array.from(node.children).forEach((child) => sanitizeExportTree(child));
+}
+
+async function createExportTemplate(element: HTMLElement, widthPx: number, heightPx: number) {
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.position = 'fixed';
+  iframe.style.left = '-100000px';
+  iframe.style.top = '0';
+  iframe.style.width = `${widthPx}px`;
+  iframe.style.height = `${heightPx}px`;
+  iframe.style.border = '0';
+  iframe.style.opacity = '0';
+  iframe.style.pointerEvents = 'none';
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentDocument;
+  if (!doc) {
+    iframe.remove();
+    throw new Error('sandbox-init-failed');
+  }
+
+  doc.open();
+  doc.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8" /><style>
+    @font-face {
+      font-family: 'Cairo';
+      src: url(data:font/ttf;base64,${EMBEDDED_CAIRO}) format('truetype');
+      font-weight: 400;
+      font-style: normal;
+      font-display: block;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: ${PDF_COLORS.page};
+      color: ${PDF_COLORS.ink};
+      font-family: ${PDF_FONT_FAMILY};
+    }
+    * {
+      box-shadow: none !important;
+      filter: none !important;
+      backdrop-filter: none !important;
+      transition: none !important;
+      animation: none !important;
+      background-image: none !important;
+    }
+  </style></head><body></body></html>`);
+  doc.close();
+
+  const wrapper = doc.createElement('div');
+  wrapper.style.width = `${widthPx}px`;
+  wrapper.style.height = `${heightPx}px`;
+  wrapper.style.background = PDF_COLORS.page;
+  wrapper.style.color = PDF_COLORS.ink;
+  wrapper.style.direction = 'rtl';
+  wrapper.style.overflow = 'hidden';
+  wrapper.style.boxSizing = 'border-box';
+  wrapper.style.fontFamily = PDF_FONT_FAMILY;
+
+  const clone = element.cloneNode(true) as HTMLElement;
+  sanitizeExportTree(clone);
+  wrapper.appendChild(clone);
+  doc.body.appendChild(wrapper);
+
+  await waitForCaptureReady(doc);
+  await Promise.all(Array.from(doc.images).map((image) => image.decode?.().catch(() => undefined) ?? Promise.resolve()));
+
+  return { iframe, wrapper } satisfies ExportSandbox;
+}
+
+async function captureElement(element: HTMLElement, widthPx: number, heightPx: number) {
+  const sandbox = await createExportTemplate(element, widthPx, heightPx);
+
+  try {
+    const canvas = await html2canvas(sandbox.wrapper, {
+      backgroundColor: PDF_COLORS.page,
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      width: widthPx,
+      height: heightPx,
+      windowWidth: widthPx,
+      windowHeight: heightPx,
+      scrollX: 0,
+      scrollY: 0,
+    });
+
+    return canvas.toDataURL('image/png');
+  } finally {
+    sandbox.iframe.remove();
+  }
 }
 
 function buildPdfFromImages(images: string[], paperSize: PaperSize, fileName: string) {
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: paperSize });
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: paperSize }) as jsPDF & {
+    addFileToVFS?: (name: string, data: string) => void;
+    addFont?: (postScriptName: string, fontName: string, fontStyle: string) => void;
+    setR2L?: (enabled: boolean) => void;
+  };
+
+  if (doc.addFileToVFS && doc.addFont) {
+    doc.addFileToVFS('Cairo-Regular.ttf', EMBEDDED_CAIRO);
+    doc.addFont('Cairo-Regular.ttf', 'Cairo', 'normal');
+    doc.setFont('Cairo', 'normal');
+    doc.setR2L?.(true);
+  }
+
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
 
