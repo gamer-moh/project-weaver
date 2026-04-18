@@ -91,6 +91,7 @@ export function GanttChart({ tasks }: GanttChartProps) {
   // Professional dependency arrows
   const arrows = useMemo(() => {
     const taskMap = new Map(tasks.map((t, i) => [t.id, { task: t, index: i }]));
+    const successorCounts = new Map<string, number>();
     const result: Array<{ d: string; isCritical: boolean }> = [];
 
     for (let i = 0; i < tasks.length; i++) {
@@ -103,6 +104,10 @@ export function GanttChart({ tasks }: GanttChartProps) {
         const pRow = predInfo.index;
         const sRow = i;
 
+        // Per-predecessor index so multi-successor drops are staggered
+        const successorIndex = successorCounts.get(pred.taskId) ?? 0;
+        successorCounts.set(pred.taskId, successorIndex + 1);
+
         const pY = HEADER_HEIGHT + pRow * rowHeight + rowHeight / 2;
         const sY = HEADER_HEIGHT + sRow * rowHeight + rowHeight / 2;
         const connection = getDependencyConnection(pred.type, pTask, task, projectStart, dayWidth);
@@ -114,7 +119,7 @@ export function GanttChart({ tasks }: GanttChartProps) {
           connection.fromSide,
           connection.toSide,
           rowHeight,
-          Math.abs(sRow - pRow) % 3,
+          successorIndex,
         );
 
         result.push({
