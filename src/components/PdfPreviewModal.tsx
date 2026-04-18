@@ -133,6 +133,11 @@ async function createExportTemplate(element: HTMLElement, widthPx: number, heigh
       background: ${PDF_COLORS.page};
       color: ${PDF_COLORS.ink};
       font-family: ${PDF_FONT_FAMILY};
+      letter-spacing: normal;
+      word-spacing: normal;
+      direction: rtl;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
     }
     * {
       box-shadow: none !important;
@@ -141,6 +146,10 @@ async function createExportTemplate(element: HTMLElement, widthPx: number, heigh
       transition: none !important;
       animation: none !important;
       background-image: none !important;
+      letter-spacing: normal !important;
+      word-spacing: normal !important;
+      font-feature-settings: normal !important;
+      font-variant-ligatures: normal !important;
     }
   </style></head><body></body></html>`);
   doc.close();
@@ -257,9 +266,9 @@ function ReportHeader({ projectName, reportSettings }: { projectName: string; re
             style={{
               fontSize: 24,
               fontWeight: 700,
-              lineHeight: 1.3,
-              letterSpacing: 0,
-              wordSpacing: '0.15em',
+              lineHeight: 1.4,
+              letterSpacing: 'normal',
+              wordSpacing: 'normal',
               whiteSpace: 'normal',
               wordBreak: 'normal',
               overflowWrap: 'break-word',
