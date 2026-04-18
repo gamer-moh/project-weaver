@@ -63,10 +63,10 @@ async function waitForCaptureReady() {
 async function captureElement(element: HTMLElement, widthPx: number, heightPx: number) {
   const canvas = await html2canvas(element, {
     backgroundColor: PDF_COLORS.page,
-    scale: Math.max(2, window.devicePixelRatio * 1.5),
+    scale: 2,
     useCORS: true,
+    allowTaint: true,
     logging: false,
-    foreignObjectRendering: true,
     width: widthPx,
     height: heightPx,
     windowWidth: widthPx,
@@ -436,13 +436,19 @@ export function PdfPreviewModal({ tasks, projectName, reportSettings, onOpenSett
     try {
       await waitForCaptureReady();
       const pages = [captureTableRef.current, captureGanttRef.current].filter(Boolean) as HTMLDivElement[];
-      const images = await Promise.all(pages.map((page) => captureElement(page, spec.widthPx, spec.heightPx)));
-      if (images.length === 0) {
-        throw new Error('empty-preview');
+      if (pages.length === 0) {
+        throw new Error('preview elements not mounted');
+      }
+      const images: string[] = [];
+      for (const page of pages) {
+        const img = await captureElement(page, spec.widthPx, spec.heightPx);
+        images.push(img);
       }
       buildPdfFromImages(images, paperSize, projectName);
-    } catch {
-      setError('تعذر إنشاء ملف PDF. جرّب مرة أخرى بعد ثوانٍ.');
+    } catch (err) {
+      console.error('[PDF export] failed:', err);
+      const message = err instanceof Error ? err.message : String(err);
+      setError(`تعذر إنشاء ملف PDF: ${message}`);
     } finally {
       setIsExporting(false);
     }
