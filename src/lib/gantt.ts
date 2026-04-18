@@ -67,25 +67,26 @@ export function buildOrthogonalDependencyPath(
   successorIndex = 0,
 ) {
   if (fromSide === 'right' && toSide === 'left') {
-    const branchOffset = 12 + successorIndex * 8;
-    const firstDropX = fromX + branchOffset;
+    const outX = fromX + 15 + successorIndex * 6;
 
-    if (firstDropX < toX - 10) {
-      return `M ${fromX} ${fromY} L ${firstDropX} ${fromY} L ${firstDropX} ${toY} L ${toX} ${toY}`;
+    // Normal forward link
+    if (outX < toX - 15) {
+      return `M ${fromX} ${fromY} L ${outX} ${fromY} L ${outX} ${toY} L ${toX} ${toY}`;
     }
 
-    const midY = fromY + (toY - fromY) / 2;
-    const safeLeftX = toX - 15 - successorIndex * 5;
+    // Backward / overlap — drop strictly below predecessor bar to clear its bounding box
+    const safeDropY = fromY + 22 + successorIndex * 4;
+    const safeLeftX = toX - 15 - successorIndex * 4;
 
-    return `M ${fromX} ${fromY} L ${firstDropX} ${fromY} L ${firstDropX} ${midY} L ${safeLeftX} ${midY} L ${safeLeftX} ${toY} L ${toX} ${toY}`;
+    return `M ${fromX} ${fromY} L ${outX} ${fromY} L ${outX} ${safeDropY} L ${safeLeftX} ${safeDropY} L ${safeLeftX} ${toY} L ${toX} ${toY}`;
   }
 
-  const branchOffset = 12 + successorIndex * 8;
-  const exitX = fromSide === 'left' ? fromX - branchOffset : fromX + branchOffset;
-  const entryX = toSide === 'left' ? toX - 15 - successorIndex * 5 : toX + 15 + successorIndex * 5;
-  const midY = fromY + (toY - fromY) / 2;
+  // Fallback for SS / FF / SF
+  const outX = fromSide === 'left' ? fromX - 15 - successorIndex * 6 : fromX + 15 + successorIndex * 6;
+  const entryX = toSide === 'left' ? toX - 15 - successorIndex * 4 : toX + 15 + successorIndex * 4;
+  const safeDropY = fromY + 22 + successorIndex * 4;
 
-  return `M ${fromX} ${fromY} L ${exitX} ${fromY} L ${exitX} ${midY} L ${entryX} ${midY} L ${entryX} ${toY} L ${toX} ${toY}`;
+  return `M ${fromX} ${fromY} L ${outX} ${fromY} L ${outX} ${safeDropY} L ${entryX} ${safeDropY} L ${entryX} ${toY} L ${toX} ${toY}`;
 }
 
 export function wrapTaskName(name: string, maxCharsPerLine: number, maxLines: number) {
