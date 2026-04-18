@@ -12,7 +12,7 @@ const HEADER_HEIGHT = 48;
 
 export function GanttChart({ tasks }: GanttChartProps) {
   const [dayWidth, setDayWidth] = useState(28);
-  const [rowHeight, setRowHeight] = useState(38);
+  const [rowHeight, setRowHeight] = useState(48);
   const barHeight = Math.min(24, Math.max(16, rowHeight - 16));
   const barMargin = (rowHeight - barHeight) / 2;
 
