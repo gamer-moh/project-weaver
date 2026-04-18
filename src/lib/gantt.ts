@@ -63,43 +63,48 @@ export function buildOrthogonalDependencyPath(
   toY: number,
   fromSide: ConnectionSide,
   toSide: ConnectionSide,
-  rowHeight: number,
-  laneIndex = 0,
+  _rowHeight: number,
+  _laneIndex = 0,
 ) {
-  const stub = Math.max(12, Math.round(rowHeight * 0.28));
-  const laneGap = 14 + laneIndex * 8;
-  const sameRow = Math.abs(toY - fromY) < 1;
-  const exitX = fromSide === 'left' ? fromX - stub : fromX + stub;
-  const entryX = toSide === 'left' ? toX - stub : toX + stub;
-  const clearDirectLane =
-    (fromSide === 'right' && toSide === 'left' && exitX <= entryX) ||
-    (fromSide === 'left' && toSide === 'right' && exitX >= entryX);
+  const STUB = 15;
 
-  if (clearDirectLane && !sameRow) {
-    const midX = (exitX + entryX) / 2;
+  // Strict Primavera P6-style FS pathfinding (right -> left)
+  if (fromSide === 'right' && toSide === 'left') {
+    const exitX = fromX + STUB;
+    const entryX = toX - STUB;
+
+    // Scenario A: Normal forward dependency — target starts after predecessor ends + stub
+    if (entryX >= exitX) {
+      return [
+        `M${fromX},${fromY}`,
+        `L${exitX},${fromY}`,
+        `L${exitX},${toY}`,
+        `L${toX},${toY}`,
+      ].join(' ');
+    }
+
+    // Scenario B: Backward/overlap — route around bars via midpoint between rows
+    const midY = (fromY + toY) / 2;
     return [
       `M${fromX},${fromY}`,
       `L${exitX},${fromY}`,
-      `L${midX},${fromY}`,
-      `L${midX},${toY}`,
+      `L${exitX},${midY}`,
+      `L${entryX},${midY}`,
       `L${entryX},${toY}`,
       `L${toX},${toY}`,
     ].join(' ');
   }
 
-  const laneY = sameRow
-    ? fromY - rowHeight / 2 - laneGap
-    : fromY + (toY > fromY ? -1 : 1) * (rowHeight / 2 + laneGap);
-  const sweepX = fromSide === 'right'
-    ? Math.max(exitX, entryX) + laneGap
-    : Math.min(exitX, entryX) - laneGap;
+  // Fallback for SS / FF / SF
+  const exitX = fromSide === 'left' ? fromX - STUB : fromX + STUB;
+  const entryX = toSide === 'left' ? toX - STUB : toX + STUB;
+  const midY = (fromY + toY) / 2;
 
   return [
     `M${fromX},${fromY}`,
     `L${exitX},${fromY}`,
-    `L${exitX},${laneY}`,
-    `L${sweepX},${laneY}`,
-    `L${sweepX},${toY}`,
+    `L${exitX},${midY}`,
+    `L${entryX},${midY}`,
     `L${entryX},${toY}`,
     `L${toX},${toY}`,
   ].join(' ');
