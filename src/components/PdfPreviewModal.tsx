@@ -456,7 +456,7 @@ const ExportGanttPage = forwardRef<HTMLDivElement, PageProps>(
           <ReportHeader projectName={projectName} reportSettings={reportSettings} />
 
           <div style={{ padding: '22px 24px 18px', flex: 1 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: `1fr ${labelWidth}px`, gap: 18, height: '100%' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: `${timelineWidth}px ${labelWidth}px`, gap: 18, height: '100%', alignItems: 'start' }}>
               <svg width={timelineWidth} height={timelineHeight} style={{ alignSelf: 'start' }}>
                 <defs>
                   <marker id="export-arrow-normal" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse">
@@ -528,28 +528,56 @@ const ExportGanttPage = forwardRef<HTMLDivElement, PageProps>(
                 })}
               </svg>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: headerHeight + 4 }}>
+              <div style={{ position: 'relative', width: labelWidth, height: timelineHeight, direction: 'rtl' }}>
                 {tasks.map((task, index) => (
                   <div
                     key={task.id}
                     style={{
-                      minHeight: rowHeight,
+                      position: 'absolute',
+                      top: headerHeight + index * rowHeight,
+                      left: 0,
+                      width: labelWidth,
+                      height: rowHeight,
+                      padding: '4px 10px 4px 16px',
+                      boxSizing: 'border-box',
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '6px 10px',
+                      flexDirection: 'column',
+                      alignItems: 'flex-end',
+                      justifyContent: 'center',
                       borderBottom: `1px solid ${PDF_COLORS.line}`,
                       background: index % 2 === 0 ? PDF_COLORS.subtle : PDF_COLORS.page,
-                      borderRadius: 8,
-                      gap: 10,
+                      overflow: 'hidden',
                     }}
                   >
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, minWidth: 92 }} dir="ltr">
-                      <span style={{ fontSize: 11, color: PDF_COLORS.muted, fontWeight: 600 }}>{formatDate(task.startDate)}</span>
-                      <span style={{ fontSize: 10, color: PDF_COLORS.muted, opacity: 0.75 }}>← {formatDate(task.endDate)}</span>
-                    </div>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: task.isCritical ? PDF_COLORS.criticalFill : PDF_COLORS.ink, flex: 1, textAlign: 'right', whiteSpace: 'normal', lineHeight: 1.4, wordBreak: 'break-word' }}>
+                    <span
+                      style={{
+                        width: '100%',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: task.isCritical ? PDF_COLORS.criticalFill : PDF_COLORS.ink,
+                        textAlign: 'right',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        lineHeight: 1.35,
+                        direction: 'rtl',
+                        unicodeBidi: 'plaintext',
+                      }}
+                    >
                       {task.name}
+                    </span>
+                    <span
+                      dir="ltr"
+                      style={{
+                        width: '100%',
+                        fontSize: 10.5,
+                        color: PDF_COLORS.muted,
+                        opacity: 0.82,
+                        textAlign: 'left',
+                        unicodeBidi: 'plaintext',
+                      }}
+                    >
+                      {formatDate(task.startDate)} ← {formatDate(task.endDate)}
                     </span>
                   </div>
                 ))}
