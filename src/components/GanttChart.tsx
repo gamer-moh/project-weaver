@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Task, diffDays, addDays, RelationType } from '@/lib/scheduler';
+import { Task, diffDays, addDays } from '@/lib/scheduler';
 import { ZoomIn, ZoomOut } from 'lucide-react';
 
 interface GanttChartProps {
@@ -42,9 +42,9 @@ export function GanttChart({ tasks }: GanttChartProps) {
 
   const todayDate = new Date(2026, 3, 13);
   const todayDayOff = diffDays(todayDate, projectStart);
-  const todayXPos = chartWidth - (todayDayOff + 0.5) * dayWidth;
+  const todayXPos = (todayDayOff + 0.5) * dayWidth;
 
-  // Months RTL
+  // Months
   const months = useMemo(() => {
     const m: Array<{ label: string; x: number; width: number }> = [];
     let currentMonth = '';
@@ -57,7 +57,7 @@ export function GanttChart({ tasks }: GanttChartProps) {
           const w = (i - startIdx) * dayWidth;
           m.push({
             label: dates[startIdx].toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' }),
-            x: chartWidth - i * dayWidth,
+            x: startIdx * dayWidth,
             width: w,
           });
         }
@@ -69,21 +69,20 @@ export function GanttChart({ tasks }: GanttChartProps) {
       const w = (dates.length - startIdx) * dayWidth;
       m.push({
         label: dates[startIdx].toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' }),
-        x: chartWidth - dates.length * dayWidth,
+        x: startIdx * dayWidth,
         width: w,
       });
     }
     return m;
-  }, [dates, chartWidth, dayWidth]);
+  }, [dates, dayWidth]);
 
-  // RTL position helpers
-  const getBarEndEdge = (task: Task) => {
-    const dayOff = diffDays(task.endDate, projectStart);
-    return chartWidth - (dayOff + 1) * dayWidth;
-  };
   const getBarStartEdge = (task: Task) => {
     const dayOff = diffDays(task.startDate, projectStart);
-    return chartWidth - dayOff * dayWidth;
+    return dayOff * dayWidth;
+  };
+  const getBarEndEdge = (task: Task) => {
+    const dayOff = diffDays(task.endDate, projectStart);
+    return (dayOff + 1) * dayWidth;
   };
   const getBarW = (start: Date, end: Date) => (diffDays(end, start) + 1) * dayWidth;
 
@@ -105,7 +104,7 @@ export function GanttChart({ tasks }: GanttChartProps) {
         const pY = HEADER_HEIGHT + pRow * ROW_HEIGHT + ROW_HEIGHT / 2;
         const sY = HEADER_HEIGHT + sRow * ROW_HEIGHT + ROW_HEIGHT / 2;
 
-        // RTL edges: start=right, finish=left
+        // LTR edges: start=left, finish=right
         const pStartX = getBarStartEdge(pTask);
         const pEndX = getBarEndEdge(pTask);
         const sStartX = getBarStartEdge(task);
@@ -116,24 +115,25 @@ export function GanttChart({ tasks }: GanttChartProps) {
 
         switch (pred.type) {
           case 'FS':
-            fromX = pEndX; fromSide = 'left';
-            toX = sStartX; toSide = 'right';
+            fromX = pEndX; fromSide = 'right';
+            toX = sStartX; toSide = 'left';
             break;
           case 'SS':
-            fromX = pStartX; fromSide = 'right';
-            toX = sStartX; toSide = 'right';
+            fromX = pStartX; fromSide = 'left';
+            toX = sStartX; toSide = 'left';
             break;
           case 'FF':
-            fromX = pEndX; fromSide = 'left';
-            toX = sEndX; toSide = 'left';
+            fromX = pEndX; fromSide = 'right';
+            toX = sEndX; toSide = 'right';
             break;
           case 'SF':
-            fromX = pStartX; fromSide = 'right';
-            toX = sEndX; toSide = 'left';
+            fromX = pStartX; fromSide = 'left';
+            toX = sEndX; toSide = 'right';
             break;
         }
 
-        const d = buildProfessionalPath(fromX, pY, toX, sY, fromSide, toSide, BAR_HEIGHT / 2);
+        const routingGap = 14 + (Math.abs(sRow - pRow) % 3) * 6;
+        const d = buildProfessionalPath(fromX, pY, toX, sY, fromSide, toSide, routingGap);
 
         result.push({
           d,
@@ -163,8 +163,8 @@ export function GanttChart({ tasks }: GanttChartProps) {
       </div>
 
       {/* Chart */}
-      <div className="flex-1 overflow-auto bg-card" dir="ltr">
-        <svg width={chartWidth} height={Math.max(chartHeight, 300)} className="min-w-full">
+      <div className="flex-1 overflow-auto bg-card [transform-origin:left_top]" dir="ltr">
+        <svg width={chartWidth} height={Math.max(chartHeight, 300)} className="min-w-full origin-top-left">
           <defs>
             <marker id="arrow-norm" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse">
               <path d="M0,0.5 L7,3 L0,5.5" fill="none" stroke="oklch(0.55 0.03 250)" strokeWidth="1.2" strokeLinejoin="round" />
@@ -184,10 +184,10 @@ export function GanttChart({ tasks }: GanttChartProps) {
             </g>
           ))}
 
-          {/* Day columns RTL */}
+          {/* Day columns */}
           {dates.map((d, i) => {
             const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-            const x = chartWidth - (i + 1) * dayWidth;
+            const x = i * dayWidth;
             return (
               <g key={i}>
                 {isWeekend && <rect x={x} y={24} width={dayWidth} height={chartHeight} className="fill-secondary/30" />}
@@ -265,51 +265,33 @@ function buildProfessionalPath(
   toX: number, toY: number,
   fromSide: 'left' | 'right',
   toSide: 'left' | 'right',
-  barHalfH: number,
+  routingGap: number,
 ): string {
-  const stub = 12; // stub length exiting the bar
-  const isDown = toY > fromY;
-
-  // Exit point: go outward from bar edge
+  const stub = 14;
+  const laneOffset = fromY <= toY ? -routingGap : routingGap;
   const exitX = fromSide === 'left' ? fromX - stub : fromX + stub;
-  // Entry approach point
   const entryX = toSide === 'left' ? toX - stub : toX + stub;
+  const needsOuterLane =
+    (fromSide === 'right' && toSide === 'left' && exitX > entryX) ||
+    (fromSide === 'left' && toSide === 'right' && exitX < entryX) ||
+    fromSide === toSide;
 
-  // Determine if we need a simple L or a Z route
-  if (fromSide === 'left' && toSide === 'right') {
-    // FS in RTL: exit left, enter right — typical forward dependency
-    if (exitX <= entryX) {
-      // Clean space between — simple Z route
-      const midX = (exitX + entryX) / 2;
-      return `M${fromX},${fromY} L${exitX},${fromY} L${exitX},${toY} L${toX},${toY}`;
-    } else {
-      // Bars overlap — need to route around
-      const midY = fromY + (ROW_HEIGHT * 0.6) * (isDown ? 1 : -1);
-      return `M${fromX},${fromY} L${exitX},${fromY} L${exitX},${midY} L${entryX},${midY} L${entryX},${toY} L${toX},${toY}`;
-    }
+  if (!needsOuterLane) {
+    return `M${fromX},${fromY} L${exitX},${fromY} L${exitX},${toY} L${toX},${toY}`;
   }
 
-  if (fromSide === 'right' && toSide === 'right') {
-    // SS: both exit/enter from right
-    const maxX = Math.max(exitX, entryX);
-    return `M${fromX},${fromY} L${maxX},${fromY} L${maxX},${toY} L${toX},${toY}`;
-  }
+  const laneY = fromY + laneOffset;
+  const midX = fromSide === 'right'
+    ? Math.max(exitX, entryX) + routingGap
+    : Math.min(exitX, entryX) - routingGap;
 
-  if (fromSide === 'left' && toSide === 'left') {
-    // FF: both exit/enter from left
-    const minX = Math.min(exitX, entryX);
-    return `M${fromX},${fromY} L${minX},${fromY} L${minX},${toY} L${toX},${toY}`;
-  }
-
-  if (fromSide === 'right' && toSide === 'left') {
-    // SF: exit right, enter left
-    if (exitX >= entryX) {
-      return `M${fromX},${fromY} L${exitX},${fromY} L${exitX},${toY} L${toX},${toY}`;
-    } else {
-      const midY = fromY + (ROW_HEIGHT * 0.6) * (isDown ? 1 : -1);
-      return `M${fromX},${fromY} L${exitX},${fromY} L${exitX},${midY} L${entryX},${midY} L${entryX},${toY} L${toX},${toY}`;
-    }
-  }
-
-  return `M${fromX},${fromY} L${toX},${toY}`;
+  return [
+    `M${fromX},${fromY}`,
+    `L${exitX},${fromY}`,
+    `L${exitX},${laneY}`,
+    `L${midX},${laneY}`,
+    `L${midX},${toY}`,
+    `L${entryX},${toY}`,
+    `L${toX},${toY}`,
+  ].join(' ');
 }
