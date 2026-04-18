@@ -1,8 +1,9 @@
-import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useMemo, useRef, useState } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { FileDown, LoaderCircle, X } from 'lucide-react';
-import { Task, RelationType, addDays, diffDays, formatDate, formatPredecessors } from '@/lib/scheduler';
+import { Task, addDays, diffDays, formatDate, formatPredecessors } from '@/lib/scheduler';
+import { buildOrthogonalDependencyPath, getDependencyConnection, getTaskBarLayout, wrapTaskName } from '@/lib/gantt';
 
 type PaperSize = 'a4' | 'a3';
 
@@ -24,14 +25,12 @@ const PDF_COLORS = {
   muted: '#6b7280',
   line: '#dbe1ea',
   subtle: '#f5f7fb',
-  altRow: '#f7f9fc',
+  altRow: '#eef3fa',
   brand: '#1f2a44',
   brandText: '#f8fafc',
   brandSubtle: '#c9d3e8',
-  bar: '#2563eb',
-  critical: '#dc2626',
-  barFill: '#3b82f6',
-  criticalFill: '#ef4444',
+  barFill: '#2563eb',
+  criticalFill: '#dc2626',
   weekend: '#f1f5f9',
   today: '#16a34a',
 };
@@ -52,12 +51,12 @@ async function waitForCaptureReady() {
 }
 
 async function captureElement(element: HTMLElement, widthPx: number, heightPx: number) {
-  const scale = Math.min(2.2, Math.max(1.6, window.devicePixelRatio * 1.6));
   const canvas = await html2canvas(element, {
     backgroundColor: PDF_COLORS.page,
-    scale,
+    scale: Math.max(2, window.devicePixelRatio * 1.5),
     useCORS: true,
     logging: false,
+    foreignObjectRendering: true,
     width: widthPx,
     height: heightPx,
     windowWidth: widthPx,
@@ -75,9 +74,7 @@ function buildPdfFromImages(images: string[], paperSize: PaperSize, fileName: st
   const pageHeight = doc.internal.pageSize.getHeight();
 
   images.forEach((image, index) => {
-    if (index > 0) {
-      doc.addPage(paperSize, 'landscape');
-    }
+    if (index > 0) doc.addPage(paperSize, 'landscape');
     doc.addImage(image, 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
   });
 
@@ -102,51 +99,6 @@ function getProjectRange(tasks: Task[]) {
     projectStart: addDays(minDate, -2),
     projectEnd: addDays(maxDate, 4),
   };
-}
-
-function buildProfessionalPath(
-  fromX: number,
-  fromY: number,
-  toX: number,
-  toY: number,
-  fromSide: 'left' | 'right',
-  toSide: 'left' | 'right',
-  rowHeight: number,
-) {
-  const stub = 12;
-  const direction = toY >= fromY ? 1 : -1;
-  const exitX = fromSide === 'left' ? fromX - stub : fromX + stub;
-  const entryX = toSide === 'left' ? toX - stub : toX + stub;
-
-  if (fromSide === 'left' && toSide === 'right') {
-    if (exitX <= entryX) {
-      return `M${fromX},${fromY} L${exitX},${fromY} L${exitX},${toY} L${toX},${toY}`;
-    }
-
-    const midY = fromY + rowHeight * 0.55 * direction;
-    return `M${fromX},${fromY} L${exitX},${fromY} L${exitX},${midY} L${entryX},${midY} L${entryX},${toY} L${toX},${toY}`;
-  }
-
-  if (fromSide === 'right' && toSide === 'right') {
-    const maxX = Math.max(exitX, entryX);
-    return `M${fromX},${fromY} L${maxX},${fromY} L${maxX},${toY} L${toX},${toY}`;
-  }
-
-  if (fromSide === 'left' && toSide === 'left') {
-    const minX = Math.min(exitX, entryX);
-    return `M${fromX},${fromY} L${minX},${fromY} L${minX},${toY} L${toX},${toY}`;
-  }
-
-  if (fromSide === 'right' && toSide === 'left') {
-    if (exitX >= entryX) {
-      return `M${fromX},${fromY} L${exitX},${fromY} L${exitX},${toY} L${toX},${toY}`;
-    }
-
-    const midY = fromY + rowHeight * 0.55 * direction;
-    return `M${fromX},${fromY} L${exitX},${fromY} L${exitX},${midY} L${entryX},${midY} L${entryX},${toY} L${toX},${toY}`;
-  }
-
-  return `M${fromX},${fromY} L${toX},${toY}`;
 }
 
 const ExportTablePage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName: string; paperSize: PaperSize }>(
@@ -202,7 +154,7 @@ const ExportTablePage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName:
             <div style={{ fontSize: 14, color: PDF_COLORS.muted }}>إجمالي المهام: {tasks.length}</div>
             <div style={{ display: 'flex', gap: 18, fontSize: 13, color: PDF_COLORS.muted }}>
               <span>المهام الحرجة: {tasks.filter((task) => task.isCritical).length}</span>
-              <span>المسار الزمني: احترافي</span>
+              <span>الأسهم: احترافية</span>
             </div>
           </div>
 
@@ -230,13 +182,13 @@ const ExportTablePage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName:
                   <tr key={task.id} style={{ background: index % 2 === 0 ? PDF_COLORS.subtle : PDF_COLORS.altRow }}>
                     <td style={cellStyle('center')}>{index + 1}</td>
                     <td style={cellStyle('center')}>{task.wbs}</td>
-                    <td style={cellStyle('right', 700)}>{task.name}</td>
+                    <td style={cellStyle('right', 700, true)}>{task.name}</td>
                     <td style={cellStyle('center')} dir="ltr">{task.duration} يوم</td>
                     <td style={cellStyle('center')} dir="ltr">{formatDate(task.startDate)}</td>
                     <td style={cellStyle('center')} dir="ltr">{formatDate(task.endDate)}</td>
                     <td style={cellStyle('center')} dir="ltr">{formatPredecessors(task.predecessors, taskIds) || '—'}</td>
                     <td style={cellStyle('center')}>{task.totalFloat}</td>
-                    <td style={{ ...cellStyle('center', 700), color: task.isCritical ? PDF_COLORS.critical : PDF_COLORS.muted }}>
+                    <td style={{ ...cellStyle('center', 700), color: task.isCritical ? PDF_COLORS.criticalFill : PDF_COLORS.muted }}>
                       {task.isCritical ? '●' : '○'}
                     </td>
                   </tr>
@@ -245,15 +197,7 @@ const ExportTablePage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName:
             </table>
           </div>
 
-          <div
-            style={{
-              marginTop: 'auto',
-              padding: '12px 24px',
-              fontSize: 12,
-              color: PDF_COLORS.muted,
-              textAlign: 'center',
-            }}
-          >
+          <div style={{ marginTop: 'auto', padding: '12px 24px', fontSize: 12, color: PDF_COLORS.muted, textAlign: 'center' }}>
             ProjectFlow — التقرير التنفيذي للمشروع
           </div>
         </div>
@@ -265,27 +209,19 @@ const ExportTablePage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName:
 const ExportGanttPage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName: string; paperSize: PaperSize }>(
   function ExportGanttPage({ tasks, projectName, paperSize }, ref) {
     const spec = PAPER_SPECS[paperSize];
-
     const { projectStart, projectEnd } = useMemo(() => getProjectRange(tasks), [tasks]);
     const totalDays = diffDays(projectEnd, projectStart) + 1;
-    const labelWidth = paperSize === 'a3' ? 230 : 180;
+    const labelWidth = paperSize === 'a3' ? 300 : 230;
     const chartWidth = spec.widthPx - spec.padding * 2 - 30 - labelWidth;
-    const dayWidth = Math.max(10, Math.min(26, chartWidth / Math.max(totalDays, 1)));
+    const dayWidth = Math.max(12, Math.min(26, chartWidth / Math.max(totalDays, 1)));
     const timelineWidth = totalDays * dayWidth;
-    const rowHeight = paperSize === 'a3' ? 44 : 36;
+    const rowHeight = paperSize === 'a3' ? 46 : 38;
+    const barHeight = Math.min(24, rowHeight - 16);
     const headerHeight = 62;
     const timelineHeight = headerHeight + tasks.length * rowHeight + 24;
     const dates = Array.from({ length: totalDays }, (_, index) => addDays(projectStart, index));
-
-    const rtlStartEdge = (task: Task) => {
-      const startOffset = diffDays(task.startDate, projectStart);
-      return timelineWidth - startOffset * dayWidth;
-    };
-
-    const rtlEndEdge = (task: Task) => {
-      const endOffset = diffDays(task.endDate, projectStart);
-      return timelineWidth - (endOffset + 1) * dayWidth;
-    };
+    const todayDate = new Date(2026, 3, 13);
+    const todayX = (diffDays(todayDate, projectStart) + 0.5) * dayWidth;
 
     const arrows = useMemo(() => {
       const taskMap = new Map(tasks.map((task, index) => [task.id, { task, index }]));
@@ -294,54 +230,26 @@ const ExportGanttPage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName:
           const predecessorInfo = taskMap.get(pred.taskId);
           if (!predecessorInfo) return [];
 
-          const predecessorTask = predecessorInfo.task;
           const predecessorY = headerHeight + predecessorInfo.index * rowHeight + rowHeight / 2;
           const successorY = headerHeight + successorIndex * rowHeight + rowHeight / 2;
-
-          const predecessorStart = rtlStartEdge(predecessorTask);
-          const predecessorFinish = rtlEndEdge(predecessorTask);
-          const successorStart = rtlStartEdge(task);
-          const successorFinish = rtlEndEdge(task);
-
-          let fromX = predecessorFinish;
-          let toX = successorStart;
-          let fromSide: 'left' | 'right' = 'left';
-          let toSide: 'left' | 'right' = 'right';
-
-          switch (pred.type) {
-            case 'FS':
-              fromX = predecessorFinish;
-              toX = successorStart;
-              fromSide = 'left';
-              toSide = 'right';
-              break;
-            case 'SS':
-              fromX = predecessorStart;
-              toX = successorStart;
-              fromSide = 'right';
-              toSide = 'right';
-              break;
-            case 'FF':
-              fromX = predecessorFinish;
-              toX = successorFinish;
-              fromSide = 'left';
-              toSide = 'left';
-              break;
-            case 'SF':
-              fromX = predecessorStart;
-              toX = successorFinish;
-              fromSide = 'right';
-              toSide = 'left';
-              break;
-          }
+          const connection = getDependencyConnection(pred.type, predecessorInfo.task, task, projectStart, dayWidth);
 
           return [{
-            d: buildProfessionalPath(fromX, predecessorY, toX, successorY, fromSide, toSide, rowHeight),
-            critical: predecessorTask.isCritical && task.isCritical,
+            d: buildOrthogonalDependencyPath(
+              connection.fromX,
+              predecessorY,
+              connection.toX,
+              successorY,
+              connection.fromSide,
+              connection.toSide,
+              rowHeight,
+              Math.abs(successorIndex - predecessorInfo.index) % 3,
+            ),
+            critical: predecessorInfo.task.isCritical && task.isCritical,
           }];
         });
       });
-    }, [tasks, projectStart, rowHeight, headerHeight, timelineWidth, dayWidth]);
+    }, [tasks, projectStart, dayWidth, rowHeight]);
 
     return (
       <div
@@ -386,16 +294,16 @@ const ExportGanttPage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName:
             <div style={{ display: 'grid', gridTemplateColumns: `1fr ${labelWidth}px`, gap: 18, height: '100%' }}>
               <svg width={timelineWidth} height={timelineHeight} style={{ alignSelf: 'start' }}>
                 <defs>
-                  <marker id="export-arrow-normal" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+                  <marker id="export-arrow-normal" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse">
                     <path d="M0,0.5 L7,3 L0,5.5" fill="none" stroke={PDF_COLORS.ink} strokeWidth="1.2" strokeLinejoin="round" />
                   </marker>
-                  <marker id="export-arrow-critical" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-                    <path d="M0,0.5 L7,3 L0,5.5" fill="none" stroke={PDF_COLORS.critical} strokeWidth="1.3" strokeLinejoin="round" />
+                  <marker id="export-arrow-critical" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+                    <path d="M0,0.5 L7,3 L0,5.5" fill="none" stroke={PDF_COLORS.criticalFill} strokeWidth="1.3" strokeLinejoin="round" />
                   </marker>
                 </defs>
 
                 {dates.map((date, index) => {
-                  const x = timelineWidth - (index + 1) * dayWidth;
+                  const x = index * dayWidth;
                   const isWeekend = date.getDay() === 0 || date.getDay() === 6;
                   return (
                     <g key={index}>
@@ -412,6 +320,9 @@ const ExportGanttPage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName:
                 })}
 
                 <line x1={0} y1={headerHeight} x2={timelineWidth} y2={headerHeight} stroke={PDF_COLORS.line} strokeWidth="1.3" />
+                {todayX > 0 && todayX < timelineWidth && (
+                  <line x1={todayX} y1={0} x2={todayX} y2={timelineHeight} stroke={PDF_COLORS.today} strokeWidth="1.5" strokeDasharray="4 2" />
+                )}
 
                 {tasks.map((_, index) => (
                   <line
@@ -430,21 +341,23 @@ const ExportGanttPage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName:
                     key={index}
                     d={arrow.d}
                     fill="none"
-                    stroke={arrow.critical ? PDF_COLORS.critical : PDF_COLORS.ink}
-                    strokeWidth={arrow.critical ? 1.7 : 1.4}
+                    stroke={arrow.critical ? PDF_COLORS.criticalFill : PDF_COLORS.ink}
+                    strokeWidth={arrow.critical ? 1.8 : 1.45}
                     strokeLinejoin="round"
                     markerEnd={`url(#${arrow.critical ? 'export-arrow-critical' : 'export-arrow-normal'})`}
                   />
                 ))}
 
                 {tasks.map((task, index) => {
-                  const barWidth = (diffDays(task.endDate, task.startDate) + 1) * dayWidth;
-                  const barX = rtlEndEdge(task);
-                  const y = headerHeight + index * rowHeight + (rowHeight - 20) / 2;
+                  const bar = getTaskBarLayout(task, projectStart, dayWidth);
+                  const y = headerHeight + index * rowHeight + (rowHeight - barHeight) / 2;
                   return (
                     <g key={task.id}>
-                      <rect x={barX} y={y + 2} width={barWidth} height={20} rx={4} fill="rgba(15,23,42,0.12)" />
-                      <rect x={barX} y={y} width={barWidth} height={20} rx={4} fill={task.isCritical ? PDF_COLORS.criticalFill : PDF_COLORS.barFill} />
+                      <rect x={bar.startX} y={y + 2} width={bar.width} height={barHeight} rx={4} fill="rgba(15,23,42,0.12)" />
+                      <rect x={bar.startX} y={y} width={bar.width} height={barHeight} rx={4} fill={task.isCritical ? PDF_COLORS.criticalFill : PDF_COLORS.barFill} />
+                      {task.progress > 0 && (
+                        <rect x={bar.startX} y={y + 2} width={bar.width * (task.progress / 100)} height={barHeight - 4} rx={3} fill="rgba(255,255,255,0.35)" />
+                      )}
                     </g>
                   );
                 })}
@@ -455,11 +368,11 @@ const ExportGanttPage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName:
                   <div
                     key={task.id}
                     style={{
-                      height: rowHeight,
+                      minHeight: rowHeight,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      padding: '0 10px',
+                      padding: '6px 10px',
                       borderBottom: `1px solid ${PDF_COLORS.line}`,
                       background: index % 2 === 0 ? PDF_COLORS.subtle : PDF_COLORS.page,
                       borderRadius: 8,
@@ -467,7 +380,7 @@ const ExportGanttPage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName:
                     }}
                   >
                     <span style={{ fontSize: 12, color: PDF_COLORS.muted }} dir="ltr">{formatDate(task.startDate)}</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: task.isCritical ? PDF_COLORS.critical : PDF_COLORS.ink, flex: 1, textAlign: 'right' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: task.isCritical ? PDF_COLORS.criticalFill : PDF_COLORS.ink, flex: 1, textAlign: 'right', whiteSpace: 'normal', lineHeight: 1.4, wordBreak: 'break-word' }}>
                       {task.name}
                     </span>
                   </div>
@@ -476,15 +389,8 @@ const ExportGanttPage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName:
             </div>
           </div>
 
-          <div
-            style={{
-              padding: '12px 24px',
-              fontSize: 12,
-              color: PDF_COLORS.muted,
-              textAlign: 'center',
-            }}
-          >
-            RTL Gantt Preview — الأسهم والمهام مصممة للطباعة الاحترافية
+          <div style={{ padding: '12px 24px', fontSize: 12, color: PDF_COLORS.muted, textAlign: 'center' }}>
+            LTR Gantt Preview — الأسهم والمهام مطابقة للعرض داخل التطبيق
           </div>
         </div>
       </div>
@@ -494,53 +400,31 @@ const ExportGanttPage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName:
 
 export function PdfPreviewModal({ tasks, projectName, onClose }: PdfPreviewModalProps) {
   const [paperSize, setPaperSize] = useState<PaperSize>('a3');
-  const [pageImages, setPageImages] = useState<string[]>([]);
-  const [isRendering, setIsRendering] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const generationRef = useRef(0);
-  const tablePageRef = useRef<HTMLDivElement>(null);
-  const ganttPageRef = useRef<HTMLDivElement>(null);
+  const captureTableRef = useRef<HTMLDivElement>(null);
+  const captureGanttRef = useRef<HTMLDivElement>(null);
   const spec = PAPER_SPECS[paperSize];
+  const previewScale = paperSize === 'a3' ? 0.58 : 0.74;
 
-  const generatePreview = useCallback(async () => {
-    const generationId = ++generationRef.current;
-    setIsRendering(true);
+  const handleDownload = useCallback(async () => {
+    setIsExporting(true);
     setError(null);
 
     try {
       await waitForCaptureReady();
-
-      const pages = [tablePageRef.current, ganttPageRef.current].filter(Boolean) as HTMLDivElement[];
-      const images = await Promise.all(
-        pages.map((page) => captureElement(page, spec.widthPx, spec.heightPx)),
-      );
-
-      if (generationRef.current !== generationId) return [];
-      setPageImages(images);
-      return images;
-    } catch (err) {
-      if (generationRef.current === generationId) {
-        setError('تعذر إنشاء المعاينة. أعد المحاولة.');
-        setPageImages([]);
+      const pages = [captureTableRef.current, captureGanttRef.current].filter(Boolean) as HTMLDivElement[];
+      const images = await Promise.all(pages.map((page) => captureElement(page, spec.widthPx, spec.heightPx)));
+      if (images.length === 0) {
+        throw new Error('empty-preview');
       }
-      return [];
+      buildPdfFromImages(images, paperSize, projectName);
+    } catch {
+      setError('تعذر إنشاء ملف PDF. جرّب مرة أخرى بعد ثوانٍ.');
     } finally {
-      if (generationRef.current === generationId) {
-        setIsRendering(false);
-      }
+      setIsExporting(false);
     }
-  }, [spec.heightPx, spec.widthPx]);
-
-  useEffect(() => {
-    void generatePreview();
-  }, [generatePreview, tasks, projectName, paperSize]);
-
-  const handleDownload = useCallback(async () => {
-    const images = pageImages.length > 0 ? pageImages : await generatePreview();
-    if (images.length === 0) return;
-    buildPdfFromImages(images, paperSize, projectName);
-    onClose();
-  }, [generatePreview, onClose, pageImages, paperSize, projectName]);
+  }, [paperSize, projectName, spec.heightPx, spec.widthPx]);
 
   return (
     <>
@@ -572,36 +456,38 @@ export function PdfPreviewModal({ tasks, projectName, onClose }: PdfPreviewModal
 
             <button
               onClick={handleDownload}
-              disabled={isRendering}
+              disabled={isExporting}
               className="flex items-center gap-1.5 rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-60"
             >
-              <FileDown className="h-3.5 w-3.5" />
+              {isExporting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
               تنزيل PDF
             </button>
           </div>
 
           <div className="flex-1 overflow-auto bg-muted/30 p-5">
-            {isRendering ? (
-              <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
-                <LoaderCircle className="h-6 w-6 animate-spin text-primary" />
-                <span className="text-sm">جاري إنشاء معاينة عربية حقيقية للصفحات...</span>
-              </div>
-            ) : error ? (
-              <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
-                <p className="text-sm text-destructive">{error}</p>
-                <button onClick={() => void generatePreview()} className="rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground">
-                  إعادة المحاولة
-                </button>
-              </div>
-            ) : (
-              <div className="mx-auto flex max-w-5xl flex-col gap-8">
-                {pageImages.map((image, index) => (
-                  <div key={index} className="overflow-hidden rounded-xl border border-border bg-background shadow-xl">
-                    <img src={image} alt={`معاينة الصفحة ${index + 1}`} className="block h-auto w-full" loading="lazy" />
-                  </div>
-                ))}
+            {error && (
+              <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {error}
               </div>
             )}
+
+            <div className="mx-auto flex max-w-5xl flex-col gap-8">
+              {[0, 1].map((pageIndex) => (
+                <div
+                  key={pageIndex}
+                  className="overflow-hidden rounded-xl border border-border bg-background shadow-xl"
+                  style={{ width: spec.widthPx * previewScale, height: spec.heightPx * previewScale }}
+                >
+                  <div style={{ width: spec.widthPx, height: spec.heightPx, transform: `scale(${previewScale})`, transformOrigin: 'top right' }}>
+                    {pageIndex === 0 ? (
+                      <ExportTablePage tasks={tasks} projectName={projectName} paperSize={paperSize} />
+                    ) : (
+                      <ExportGanttPage tasks={tasks} projectName={projectName} paperSize={paperSize} />
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -611,15 +497,14 @@ export function PdfPreviewModal({ tasks, projectName, onClose }: PdfPreviewModal
         style={{
           position: 'fixed',
           top: 0,
-          left: -20000,
+          left: 'calc(100vw + 32px)',
           width: spec.widthPx,
           pointerEvents: 'none',
-          zIndex: -1,
         }}
       >
-        <ExportTablePage ref={tablePageRef} tasks={tasks} projectName={projectName} paperSize={paperSize} />
+        <ExportTablePage ref={captureTableRef} tasks={tasks} projectName={projectName} paperSize={paperSize} />
         <div style={{ height: 40 }} />
-        <ExportGanttPage ref={ganttPageRef} tasks={tasks} projectName={projectName} paperSize={paperSize} />
+        <ExportGanttPage ref={captureGanttRef} tasks={tasks} projectName={projectName} paperSize={paperSize} />
       </div>
     </>
   );
@@ -629,7 +514,7 @@ export function exportSchedulePdf() {
   return undefined;
 }
 
-function cellStyle(textAlign: 'right' | 'center', fontWeight = 500) {
+function cellStyle(textAlign: 'right' | 'center', fontWeight = 500, wrap = false) {
   return {
     padding: '10px 8px',
     borderBottom: `1px solid ${PDF_COLORS.line}`,
@@ -637,7 +522,9 @@ function cellStyle(textAlign: 'right' | 'center', fontWeight = 500) {
     fontWeight,
     color: PDF_COLORS.ink,
     overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
+    textOverflow: wrap ? 'clip' : 'ellipsis',
+    whiteSpace: wrap ? 'normal' : 'nowrap',
+    wordBreak: wrap ? 'break-word' : 'normal',
+    lineHeight: wrap ? 1.45 : 1.2,
   } as const;
 }

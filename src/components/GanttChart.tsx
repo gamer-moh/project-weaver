@@ -1,18 +1,20 @@
 import { useMemo, useState } from 'react';
 import { Task, diffDays, addDays } from '@/lib/scheduler';
 import { ZoomIn, ZoomOut } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import { buildOrthogonalDependencyPath, getDependencyConnection, getTaskBarLayout, wrapTaskName } from '@/lib/gantt';
 
 interface GanttChartProps {
   tasks: Task[];
 }
 
-const ROW_HEIGHT = 36;
 const HEADER_HEIGHT = 48;
-const BAR_HEIGHT = 18;
-const BAR_MARGIN = (ROW_HEIGHT - BAR_HEIGHT) / 2;
 
 export function GanttChart({ tasks }: GanttChartProps) {
   const [dayWidth, setDayWidth] = useState(28);
+  const [rowHeight, setRowHeight] = useState(38);
+  const barHeight = Math.min(24, Math.max(16, rowHeight - 16));
+  const barMargin = (rowHeight - barHeight) / 2;
 
   const { projectStart, totalDays, dates } = useMemo(() => {
     if (tasks.length === 0) {
@@ -38,7 +40,7 @@ export function GanttChart({ tasks }: GanttChartProps) {
   }, [tasks]);
 
   const chartWidth = totalDays * dayWidth;
-  const chartHeight = HEADER_HEIGHT + tasks.length * ROW_HEIGHT;
+  const chartHeight = HEADER_HEIGHT + tasks.length * rowHeight;
 
   const todayDate = new Date(2026, 3, 13);
   const todayDayOff = diffDays(todayDate, projectStart);
@@ -101,39 +103,19 @@ export function GanttChart({ tasks }: GanttChartProps) {
         const pRow = predInfo.index;
         const sRow = i;
 
-        const pY = HEADER_HEIGHT + pRow * ROW_HEIGHT + ROW_HEIGHT / 2;
-        const sY = HEADER_HEIGHT + sRow * ROW_HEIGHT + ROW_HEIGHT / 2;
-
-        // LTR edges: start=left, finish=right
-        const pStartX = getBarStartEdge(pTask);
-        const pEndX = getBarEndEdge(pTask);
-        const sStartX = getBarStartEdge(task);
-        const sEndX = getBarEndEdge(task);
-
-        let fromX: number, toX: number;
-        let fromSide: 'left' | 'right', toSide: 'left' | 'right';
-
-        switch (pred.type) {
-          case 'FS':
-            fromX = pEndX; fromSide = 'right';
-            toX = sStartX; toSide = 'left';
-            break;
-          case 'SS':
-            fromX = pStartX; fromSide = 'left';
-            toX = sStartX; toSide = 'left';
-            break;
-          case 'FF':
-            fromX = pEndX; fromSide = 'right';
-            toX = sEndX; toSide = 'right';
-            break;
-          case 'SF':
-            fromX = pStartX; fromSide = 'left';
-            toX = sEndX; toSide = 'right';
-            break;
-        }
-
-        const routingGap = 14 + (Math.abs(sRow - pRow) % 3) * 6;
-        const d = buildProfessionalPath(fromX, pY, toX, sY, fromSide, toSide, routingGap);
+        const pY = HEADER_HEIGHT + pRow * rowHeight + rowHeight / 2;
+        const sY = HEADER_HEIGHT + sRow * rowHeight + rowHeight / 2;
+        const connection = getDependencyConnection(pred.type, pTask, task, projectStart, dayWidth);
+        const d = buildOrthogonalDependencyPath(
+          connection.fromX,
+          pY,
+          connection.toX,
+          sY,
+          connection.fromSide,
+          connection.toSide,
+          rowHeight,
+          Math.abs(sRow - pRow) % 3,
+        );
 
         result.push({
           d,
@@ -142,24 +124,20 @@ export function GanttChart({ tasks }: GanttChartProps) {
       }
     }
     return result;
-  }, [tasks, projectStart, chartWidth, dayWidth]);
+  }, [tasks, projectStart, dayWidth, rowHeight]);
 
   return (
     <div className="flex flex-col h-full">
       {/* Zoom toolbar */}
-      <div className="flex items-center gap-3 px-3 py-1.5 bg-secondary/40 border-b border-border">
+      <div className="flex items-center gap-4 px-3 py-2 bg-secondary/40 border-b border-border flex-wrap">
         <ZoomOut className="w-3.5 h-3.5 text-muted-foreground" />
-        <input
-          type="range"
-          min={10}
-          max={60}
-          value={dayWidth}
-          onChange={e => setDayWidth(Number(e.target.value))}
-          className="w-32 h-1 accent-primary cursor-pointer"
-          dir="ltr"
-        />
+        <Slider value={[dayWidth]} min={10} max={60} step={1} onValueChange={([value]) => setDayWidth(value)} className="w-32" dir="ltr" />
         <ZoomIn className="w-3.5 h-3.5 text-muted-foreground" />
         <span className="text-[10px] text-muted-foreground">{dayWidth}px/يوم</span>
+        <span className="h-4 w-px bg-border" />
+        <span className="text-[10px] text-muted-foreground">ارتفاع الصف</span>
+        <Slider value={[rowHeight]} min={30} max={64} step={2} onValueChange={([value]) => setRowHeight(value)} className="w-28" dir="ltr" />
+        <span className="text-[10px] text-muted-foreground">{rowHeight}px</span>
       </div>
 
       {/* Chart */}
@@ -202,7 +180,7 @@ export function GanttChart({ tasks }: GanttChartProps) {
           <line x1={0} y1={HEADER_HEIGHT} x2={chartWidth} y2={HEADER_HEIGHT} className="stroke-border" strokeWidth={1} />
 
           {tasks.map((_, i) => (
-            <line key={i} x1={0} y1={HEADER_HEIGHT + (i + 1) * ROW_HEIGHT} x2={chartWidth} y2={HEADER_HEIGHT + (i + 1) * ROW_HEIGHT} className="stroke-border/20" strokeWidth={0.5} />
+            <line key={i} x1={0} y1={HEADER_HEIGHT + (i + 1) * rowHeight} x2={chartWidth} y2={HEADER_HEIGHT + (i + 1) * rowHeight} className="stroke-border/20" strokeWidth={0.5} />
           ))}
 
           {/* Today */}
@@ -225,28 +203,36 @@ export function GanttChart({ tasks }: GanttChartProps) {
 
           {/* Task bars */}
           {tasks.map((task, i) => {
-            const w = getBarW(task.startDate, task.endDate);
-            const barLeft = getBarEndEdge(task);
-            const y = HEADER_HEIGHT + i * ROW_HEIGHT + BAR_MARGIN;
+            const bar = getTaskBarLayout(task, projectStart, dayWidth);
+            const y = HEADER_HEIGHT + i * rowHeight + barMargin;
+            const labelLines = wrapTaskName(task.name, Math.max(8, Math.floor(dayWidth * 0.65)), 3);
 
             return (
               <g key={task.id}>
-                <rect x={barLeft} y={y + 2} width={w} height={BAR_HEIGHT} rx={3} fill="black" opacity={0.12} />
+                <rect x={bar.startX} y={y + 2} width={bar.width} height={barHeight} rx={3} fill="black" opacity={0.12} />
                 <rect
-                  x={barLeft} y={y} width={w} height={BAR_HEIGHT} rx={3}
+                  x={bar.startX} y={y} width={bar.width} height={barHeight} rx={3}
                   className={task.isCritical ? 'fill-gantt-bar-critical' : 'fill-gantt-bar'}
                   opacity={0.9}
                 />
                 {task.progress > 0 && (
                   <rect
-                    x={barLeft + w - w * (task.progress / 100)} y={y + 2}
-                    width={w * (task.progress / 100)} height={BAR_HEIGHT - 4}
+                    x={bar.startX} y={y + 2}
+                    width={bar.width * (task.progress / 100)} height={barHeight - 4}
                     rx={2} className={task.isCritical ? 'fill-critical-path' : 'fill-primary'} opacity={0.5}
                   />
                 )}
-                <text x={barLeft + w + 6} y={y + BAR_HEIGHT / 2 + 4} className="fill-muted-foreground text-[9px] font-medium" style={{ fontFamily: 'Cairo, sans-serif' }}>
-                  {task.name}
-                </text>
+                {labelLines.map((line, lineIndex) => (
+                  <text
+                    key={`${task.id}-${lineIndex}`}
+                    x={bar.endX + 8}
+                    y={y + 10 + lineIndex * 10}
+                    className="fill-muted-foreground text-[9px] font-medium"
+                    style={{ fontFamily: 'Cairo, sans-serif' }}
+                  >
+                    {line}
+                  </text>
+                ))}
               </g>
             );
           })}
@@ -254,44 +240,4 @@ export function GanttChart({ tasks }: GanttChartProps) {
       </div>
     </div>
   );
-}
-
-/**
- * Professional orthogonal arrow path with clean right-angle routing.
- * Exits perpendicular to the bar edge, routes orthogonally, enters perpendicular.
- */
-function buildProfessionalPath(
-  fromX: number, fromY: number,
-  toX: number, toY: number,
-  fromSide: 'left' | 'right',
-  toSide: 'left' | 'right',
-  routingGap: number,
-): string {
-  const stub = 14;
-  const laneOffset = fromY <= toY ? -routingGap : routingGap;
-  const exitX = fromSide === 'left' ? fromX - stub : fromX + stub;
-  const entryX = toSide === 'left' ? toX - stub : toX + stub;
-  const needsOuterLane =
-    (fromSide === 'right' && toSide === 'left' && exitX > entryX) ||
-    (fromSide === 'left' && toSide === 'right' && exitX < entryX) ||
-    fromSide === toSide;
-
-  if (!needsOuterLane) {
-    return `M${fromX},${fromY} L${exitX},${fromY} L${exitX},${toY} L${toX},${toY}`;
-  }
-
-  const laneY = fromY + laneOffset;
-  const midX = fromSide === 'right'
-    ? Math.max(exitX, entryX) + routingGap
-    : Math.min(exitX, entryX) - routingGap;
-
-  return [
-    `M${fromX},${fromY}`,
-    `L${exitX},${fromY}`,
-    `L${exitX},${laneY}`,
-    `L${midX},${laneY}`,
-    `L${midX},${toY}`,
-    `L${entryX},${toY}`,
-    `L${toX},${toY}`,
-  ].join(' ');
 }
