@@ -147,7 +147,7 @@ export function GanttChart({ tasks }: GanttChartProps) {
 
       {/* Chart */}
       <div className="flex-1 overflow-auto bg-card [transform-origin:left_top]" dir="ltr">
-        <svg width={chartWidth} height={Math.max(chartHeight, 300)} className="min-w-full origin-top-left">
+        <svg width={chartWidth} height={Math.max(chartHeight, 300)} className="min-w-full origin-top-left overflow-visible">
           <defs>
             <marker id="arrow-norm" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse">
               <path d="M0,0.5 L7,3 L0,5.5" fill="none" stroke="oklch(0.55 0.03 250)" strokeWidth="1.2" strokeLinejoin="round" />

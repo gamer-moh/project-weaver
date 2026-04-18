@@ -66,53 +66,26 @@ export function buildOrthogonalDependencyPath(
   _rowHeight: number,
   successorIndex = 0,
 ) {
-  const STUB = 15;
-  const STAGGER = successorIndex * 4;
-
-  // Strict Primavera P6-style FS pathfinding (right -> left)
   if (fromSide === 'right' && toSide === 'left') {
-    const gap = toX - fromX;
+    const branchOffset = 12 + successorIndex * 8;
+    const firstDropX = fromX + branchOffset;
 
-    // Scenario A: Forward dependency (target starts at/after predecessor ends)
-    if (gap >= 0) {
-      // Smart dynamic offset: never draw past target if they are close
-      const baseDrop = gap > 20 ? fromX + STUB : fromX + Math.max(gap / 2, 5);
-      const dropX = baseDrop + STAGGER;
-      return [
-        `M${fromX},${fromY}`,
-        `L${dropX},${fromY}`,
-        `L${dropX},${toY}`,
-        `L${toX},${toY}`,
-      ].join(' ');
+    if (firstDropX < toX - 10) {
+      return `M ${fromX} ${fromY} L ${firstDropX} ${fromY} L ${firstDropX} ${toY} L ${toX} ${toY}`;
     }
 
-    // Scenario B: Backward/overlap — route around bars via midpoint between rows
-    const exitX = fromX + STUB + STAGGER;
-    const entryX = toX - STUB - STAGGER;
-    const midY = (fromY + toY) / 2;
-    return [
-      `M${fromX},${fromY}`,
-      `L${exitX},${fromY}`,
-      `L${exitX},${midY}`,
-      `L${entryX},${midY}`,
-      `L${entryX},${toY}`,
-      `L${toX},${toY}`,
-    ].join(' ');
+    const midY = fromY + (toY - fromY) / 2;
+    const safeLeftX = toX - 15 - successorIndex * 5;
+
+    return `M ${fromX} ${fromY} L ${firstDropX} ${fromY} L ${firstDropX} ${midY} L ${safeLeftX} ${midY} L ${safeLeftX} ${toY} L ${toX} ${toY}`;
   }
 
-  // Fallback for SS / FF / SF
-  const exitX = fromSide === 'left' ? fromX - STUB - STAGGER : fromX + STUB + STAGGER;
-  const entryX = toSide === 'left' ? toX - STUB - STAGGER : toX + STUB + STAGGER;
-  const midY = (fromY + toY) / 2;
+  const branchOffset = 12 + successorIndex * 8;
+  const exitX = fromSide === 'left' ? fromX - branchOffset : fromX + branchOffset;
+  const entryX = toSide === 'left' ? toX - 15 - successorIndex * 5 : toX + 15 + successorIndex * 5;
+  const midY = fromY + (toY - fromY) / 2;
 
-  return [
-    `M${fromX},${fromY}`,
-    `L${exitX},${fromY}`,
-    `L${exitX},${midY}`,
-    `L${entryX},${midY}`,
-    `L${entryX},${toY}`,
-    `L${toX},${toY}`,
-  ].join(' ');
+  return `M ${fromX} ${fromY} L ${exitX} ${fromY} L ${exitX} ${midY} L ${entryX} ${midY} L ${entryX} ${toY} L ${toX} ${toY}`;
 }
 
 export function wrapTaskName(name: string, maxCharsPerLine: number, maxLines: number) {
