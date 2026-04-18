@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Task, diffDays, addDays, RelationType } from '@/lib/scheduler';
+import { Task, diffDays, addDays } from '@/lib/scheduler';
 import { ZoomIn, ZoomOut } from 'lucide-react';
 
 interface GanttChartProps {
@@ -42,9 +42,9 @@ export function GanttChart({ tasks }: GanttChartProps) {
 
   const todayDate = new Date(2026, 3, 13);
   const todayDayOff = diffDays(todayDate, projectStart);
-  const todayXPos = chartWidth - (todayDayOff + 0.5) * dayWidth;
+  const todayXPos = (todayDayOff + 0.5) * dayWidth;
 
-  // Months RTL
+  // Months
   const months = useMemo(() => {
     const m: Array<{ label: string; x: number; width: number }> = [];
     let currentMonth = '';
@@ -57,7 +57,7 @@ export function GanttChart({ tasks }: GanttChartProps) {
           const w = (i - startIdx) * dayWidth;
           m.push({
             label: dates[startIdx].toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' }),
-            x: chartWidth - i * dayWidth,
+            x: startIdx * dayWidth,
             width: w,
           });
         }
@@ -69,21 +69,20 @@ export function GanttChart({ tasks }: GanttChartProps) {
       const w = (dates.length - startIdx) * dayWidth;
       m.push({
         label: dates[startIdx].toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' }),
-        x: chartWidth - dates.length * dayWidth,
+        x: startIdx * dayWidth,
         width: w,
       });
     }
     return m;
-  }, [dates, chartWidth, dayWidth]);
+  }, [dates, dayWidth]);
 
-  // RTL position helpers
-  const getBarEndEdge = (task: Task) => {
-    const dayOff = diffDays(task.endDate, projectStart);
-    return chartWidth - (dayOff + 1) * dayWidth;
-  };
   const getBarStartEdge = (task: Task) => {
     const dayOff = diffDays(task.startDate, projectStart);
-    return chartWidth - dayOff * dayWidth;
+    return dayOff * dayWidth;
+  };
+  const getBarEndEdge = (task: Task) => {
+    const dayOff = diffDays(task.endDate, projectStart);
+    return (dayOff + 1) * dayWidth;
   };
   const getBarW = (start: Date, end: Date) => (diffDays(end, start) + 1) * dayWidth;
 
@@ -105,7 +104,7 @@ export function GanttChart({ tasks }: GanttChartProps) {
         const pY = HEADER_HEIGHT + pRow * ROW_HEIGHT + ROW_HEIGHT / 2;
         const sY = HEADER_HEIGHT + sRow * ROW_HEIGHT + ROW_HEIGHT / 2;
 
-        // RTL edges: start=right, finish=left
+        // LTR edges: start=left, finish=right
         const pStartX = getBarStartEdge(pTask);
         const pEndX = getBarEndEdge(pTask);
         const sStartX = getBarStartEdge(task);
@@ -116,24 +115,25 @@ export function GanttChart({ tasks }: GanttChartProps) {
 
         switch (pred.type) {
           case 'FS':
-            fromX = pEndX; fromSide = 'left';
-            toX = sStartX; toSide = 'right';
+            fromX = pEndX; fromSide = 'right';
+            toX = sStartX; toSide = 'left';
             break;
           case 'SS':
-            fromX = pStartX; fromSide = 'right';
-            toX = sStartX; toSide = 'right';
+            fromX = pStartX; fromSide = 'left';
+            toX = sStartX; toSide = 'left';
             break;
           case 'FF':
-            fromX = pEndX; fromSide = 'left';
-            toX = sEndX; toSide = 'left';
+            fromX = pEndX; fromSide = 'right';
+            toX = sEndX; toSide = 'right';
             break;
           case 'SF':
-            fromX = pStartX; fromSide = 'right';
-            toX = sEndX; toSide = 'left';
+            fromX = pStartX; fromSide = 'left';
+            toX = sEndX; toSide = 'right';
             break;
         }
 
-        const d = buildProfessionalPath(fromX, pY, toX, sY, fromSide, toSide, BAR_HEIGHT / 2);
+        const routingGap = 14 + (Math.abs(sRow - pRow) % 3) * 6;
+        const d = buildProfessionalPath(fromX, pY, toX, sY, fromSide, toSide, routingGap);
 
         result.push({
           d,
