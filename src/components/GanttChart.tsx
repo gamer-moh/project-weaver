@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Task, diffDays, addDays } from '@/lib/scheduler';
 import { ZoomIn, ZoomOut } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
-import { buildOrthogonalDependencyPath, getDependencyConnection, getTaskBarLayout, wrapTaskName } from '@/lib/gantt';
+import { buildOrthogonalDependencyPath, getDependencyConnection, getTaskBarLayout } from '@/lib/gantt';
 
 interface GanttChartProps {
   tasks: Task[];
@@ -236,20 +236,20 @@ export function GanttChart({ tasks }: GanttChartProps) {
         {tasks.map((task, i) => {
           const bar = getTaskBarLayout(task, projectStart, dayWidth);
           const y = HEADER_HEIGHT + i * rowHeight + barMargin;
+
           return (
             <div
               key={`label-${task.id}`}
               dir="rtl"
-              className="absolute text-[10px] font-medium text-muted-foreground pointer-events-none"
+              className="absolute z-10 whitespace-nowrap text-[10px] font-medium text-muted-foreground pointer-events-none"
               style={{
-                left: bar.endX + 10,
-                top: y,
-                height: barHeight,
-                lineHeight: `${barHeight}px`,
-                whiteSpace: 'nowrap',
+                position: 'absolute',
+                left: `${bar.endX + 15}px`,
+                top: `${y + 2}px`,
                 fontFamily: 'Cairo, sans-serif',
                 letterSpacing: 'normal',
                 wordSpacing: 'normal',
+                lineHeight: `${barHeight}px`,
               }}
             >
               {task.name}
