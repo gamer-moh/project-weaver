@@ -210,7 +210,6 @@ function buildPdfFromImages(images: string[], paperSize: PaperSize, fileName: st
     doc.addFileToVFS('Cairo-Regular.ttf', EMBEDDED_CAIRO);
     doc.addFont('Cairo-Regular.ttf', 'Cairo', 'normal');
     doc.setFont('Cairo', 'normal');
-    doc.setR2L?.(true);
   }
 
   const pageWidth = doc.internal.pageSize.getWidth();
