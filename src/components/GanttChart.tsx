@@ -9,6 +9,9 @@ interface GanttChartProps {
 }
 
 const HEADER_HEIGHT = 48;
+const LABEL_GUTTER_MIN = 220;
+const LABEL_GUTTER_MAX = 320;
+const LABEL_GAP = 14;
 
 export function GanttChart({ tasks }: GanttChartProps) {
   const [dayWidth, setDayWidth] = useState(28);
@@ -41,12 +44,13 @@ export function GanttChart({ tasks }: GanttChartProps) {
 
   const chartWidth = totalDays * dayWidth;
   const chartHeight = HEADER_HEIGHT + tasks.length * rowHeight;
+  const labelGutterWidth = Math.max(LABEL_GUTTER_MIN, Math.min(LABEL_GUTTER_MAX, dayWidth * 9));
+  const scrollWidth = chartWidth + labelGutterWidth;
 
   const todayDate = new Date(2026, 3, 13);
   const todayDayOff = diffDays(todayDate, projectStart);
   const todayXPos = (todayDayOff + 0.5) * dayWidth;
 
-  // Months
   const months = useMemo(() => {
     const m: Array<{ label: string; x: number; width: number }> = [];
     let currentMonth = '';
@@ -67,6 +71,7 @@ export function GanttChart({ tasks }: GanttChartProps) {
         startIdx = i;
       }
     });
+
     if (dates.length > 0) {
       const w = (dates.length - startIdx) * dayWidth;
       m.push({
@@ -75,20 +80,10 @@ export function GanttChart({ tasks }: GanttChartProps) {
         width: w,
       });
     }
+
     return m;
   }, [dates, dayWidth]);
 
-  const getBarStartEdge = (task: Task) => {
-    const dayOff = diffDays(task.startDate, projectStart);
-    return dayOff * dayWidth;
-  };
-  const getBarEndEdge = (task: Task) => {
-    const dayOff = diffDays(task.endDate, projectStart);
-    return (dayOff + 1) * dayWidth;
-  };
-  const getBarW = (start: Date, end: Date) => (diffDays(end, start) + 1) * dayWidth;
-
-  // Professional dependency arrows
   const arrows = useMemo(() => {
     const taskMap = new Map(tasks.map((t, i) => [t.id, { task: t, index: i }]));
     const successorCounts = new Map<string, number>();
@@ -103,8 +98,6 @@ export function GanttChart({ tasks }: GanttChartProps) {
         const pTask = predInfo.task;
         const pRow = predInfo.index;
         const sRow = i;
-
-        // Per-predecessor index so multi-successor drops are staggered
         const successorIndex = successorCounts.get(pred.taskId) ?? 0;
         successorCounts.set(pred.taskId, successorIndex + 1);
 
@@ -128,16 +121,16 @@ export function GanttChart({ tasks }: GanttChartProps) {
         });
       }
     }
+
     return result;
   }, [tasks, projectStart, dayWidth, rowHeight]);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Zoom toolbar */}
-      <div className="flex items-center gap-4 px-3 py-2 bg-secondary/40 border-b border-border flex-wrap">
-        <ZoomOut className="w-3.5 h-3.5 text-muted-foreground" />
+    <div className="flex h-full flex-col">
+      <div className="flex flex-wrap items-center gap-4 border-b border-border bg-secondary/40 px-3 py-2">
+        <ZoomOut className="h-3.5 w-3.5 text-muted-foreground" />
         <Slider value={[dayWidth]} min={10} max={60} step={1} onValueChange={([value]) => setDayWidth(value)} className="w-32" dir="ltr" />
-        <ZoomIn className="w-3.5 h-3.5 text-muted-foreground" />
+        <ZoomIn className="h-3.5 w-3.5 text-muted-foreground" />
         <span className="text-[10px] text-muted-foreground">{dayWidth}px/يوم</span>
         <span className="h-4 w-px bg-border" />
         <span className="text-[10px] text-muted-foreground">ارتفاع الصف</span>
@@ -145,117 +138,123 @@ export function GanttChart({ tasks }: GanttChartProps) {
         <span className="text-[10px] text-muted-foreground">{rowHeight}px</span>
       </div>
 
-      {/* Chart */}
       <div className="flex-1 overflow-auto bg-card [transform-origin:left_top]" dir="ltr">
-        <div className="relative" style={{ width: chartWidth, height: Math.max(chartHeight, 300) }}>
-        <svg width={chartWidth} height={Math.max(chartHeight, 300)} className="min-w-full origin-top-left overflow-visible">
-          <defs>
-            <marker id="arrow-norm" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse">
-              <path d="M0,0.5 L7,3 L0,5.5" fill="none" stroke="oklch(0.55 0.03 250)" strokeWidth="1.2" strokeLinejoin="round" />
-            </marker>
-            <marker id="arrow-crit" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse">
-              <path d="M0,0.5 L7,3 L0,5.5" fill="none" stroke="oklch(0.65 0.22 25)" strokeWidth="1.2" strokeLinejoin="round" />
-            </marker>
-          </defs>
+        <div className="relative" style={{ width: scrollWidth, height: Math.max(chartHeight, 300) }}>
+          <svg width={chartWidth} height={Math.max(chartHeight, 300)} className="block origin-top-left" style={{ overflow: 'hidden' }}>
+            <defs>
+              <marker id="arrow-norm" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+                <path d="M0,0.5 L7,3 L0,5.5" fill="none" stroke="oklch(0.55 0.03 250)" strokeWidth="1.2" strokeLinejoin="round" />
+              </marker>
+              <marker id="arrow-crit" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+                <path d="M0,0.5 L7,3 L0,5.5" fill="none" stroke="oklch(0.65 0.22 25)" strokeWidth="1.2" strokeLinejoin="round" />
+              </marker>
+            </defs>
 
-          {/* Month headers */}
-          {months.map((m, i) => (
-            <g key={i}>
-              <rect x={m.x} y={0} width={m.width} height={24} className="fill-secondary/80" />
-              <text x={m.x + m.width - 8} y={16} textAnchor="end" className="fill-muted-foreground text-[10px] font-medium" style={{ fontFamily: 'Cairo, sans-serif' }}>
-                {m.label}
-              </text>
-            </g>
-          ))}
-
-          {/* Day columns */}
-          {dates.map((d, i) => {
-            const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-            const x = i * dayWidth;
-            return (
+            {months.map((m, i) => (
               <g key={i}>
-                {isWeekend && <rect x={x} y={24} width={dayWidth} height={chartHeight} className="fill-secondary/30" />}
-                <text x={x + dayWidth / 2} y={40} textAnchor="middle" className={`text-[9px] ${isWeekend ? 'fill-muted-foreground/50' : 'fill-muted-foreground'}`}>
-                  {d.getDate()}
+                <rect x={m.x} y={0} width={m.width} height={24} className="fill-secondary/80" />
+                <text x={m.x + m.width - 8} y={16} textAnchor="end" className="fill-muted-foreground text-[10px] font-medium" style={{ fontFamily: 'Cairo, sans-serif' }}>
+                  {m.label}
                 </text>
-                <line x1={x} y1={24} x2={x} y2={chartHeight} className="stroke-border/30" strokeWidth={0.5} />
               </g>
-            );
-          })}
+            ))}
 
-          <line x1={0} y1={HEADER_HEIGHT} x2={chartWidth} y2={HEADER_HEIGHT} className="stroke-border" strokeWidth={1} />
+            {dates.map((d, i) => {
+              const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+              const x = i * dayWidth;
+              return (
+                <g key={i}>
+                  {isWeekend && <rect x={x} y={24} width={dayWidth} height={chartHeight} className="fill-secondary/30" />}
+                  <text x={x + dayWidth / 2} y={40} textAnchor="middle" className={`text-[9px] ${isWeekend ? 'fill-muted-foreground/50' : 'fill-muted-foreground'}`}>
+                    {d.getDate()}
+                  </text>
+                  <line x1={x} y1={24} x2={x} y2={chartHeight} className="stroke-border/30" strokeWidth={0.5} />
+                </g>
+              );
+            })}
 
-          {tasks.map((_, i) => (
-            <line key={i} x1={0} y1={HEADER_HEIGHT + (i + 1) * rowHeight} x2={chartWidth} y2={HEADER_HEIGHT + (i + 1) * rowHeight} className="stroke-border/20" strokeWidth={0.5} />
-          ))}
+            <line x1={0} y1={HEADER_HEIGHT} x2={chartWidth} y2={HEADER_HEIGHT} className="stroke-border" strokeWidth={1} />
 
-          {/* Today */}
-          {todayXPos > 0 && todayXPos < chartWidth && (
-            <line x1={todayXPos} y1={0} x2={todayXPos} y2={chartHeight} className="stroke-gantt-today" strokeWidth={1.5} strokeDasharray="4 2" />
-          )}
+            {tasks.map((_, i) => (
+              <line key={i} x1={0} y1={HEADER_HEIGHT + (i + 1) * rowHeight} x2={chartWidth} y2={HEADER_HEIGHT + (i + 1) * rowHeight} className="stroke-border/20" strokeWidth={0.5} />
+            ))}
 
-          {/* Arrows */}
-          {arrows.map((arrow, i) => (
-            <path
-              key={`dep-${i}`}
-              d={arrow.d}
-              fill="none"
-              stroke={arrow.isCritical ? 'oklch(0.65 0.22 25)' : 'oklch(0.55 0.03 250)'}
-              strokeWidth={1.2}
-              strokeLinejoin="round"
-              markerEnd={`url(#arrow-${arrow.isCritical ? 'crit' : 'norm'})`}
-            />
-          ))}
+            {todayXPos > 0 && todayXPos < chartWidth && (
+              <line x1={todayXPos} y1={0} x2={todayXPos} y2={chartHeight} className="stroke-gantt-today" strokeWidth={1.5} strokeDasharray="4 2" />
+            )}
 
-          {/* Task bars */}
-          {tasks.map((task, i) => {
-            const bar = getTaskBarLayout(task, projectStart, dayWidth);
-            const y = HEADER_HEIGHT + i * rowHeight + barMargin;
+            {arrows.map((arrow, i) => (
+              <path
+                key={`dep-${i}`}
+                d={arrow.d}
+                fill="none"
+                stroke={arrow.isCritical ? 'oklch(0.65 0.22 25)' : 'oklch(0.55 0.03 250)'}
+                strokeWidth={1.2}
+                strokeLinejoin="round"
+                markerEnd={`url(#arrow-${arrow.isCritical ? 'crit' : 'norm'})`}
+              />
+            ))}
 
-            return (
-              <g key={task.id}>
-                <rect x={bar.startX} y={y + 2} width={bar.width} height={barHeight} rx={3} fill="black" opacity={0.12} />
-                <rect
-                  x={bar.startX} y={y} width={bar.width} height={barHeight} rx={3}
-                  className={task.isCritical ? 'fill-gantt-bar-critical' : 'fill-gantt-bar'}
-                  opacity={0.9}
-                />
-                {task.progress > 0 && (
+            {tasks.map((task, i) => {
+              const bar = getTaskBarLayout(task, projectStart, dayWidth);
+              const y = HEADER_HEIGHT + i * rowHeight + barMargin;
+
+              return (
+                <g key={task.id}>
+                  <rect x={bar.startX} y={y + 2} width={bar.width} height={barHeight} rx={3} fill="black" opacity={0.12} />
                   <rect
-                    x={bar.startX} y={y + 2}
-                    width={bar.width * (task.progress / 100)} height={barHeight - 4}
-                    rx={2} className={task.isCritical ? 'fill-critical-path' : 'fill-primary'} opacity={0.5}
+                    x={bar.startX}
+                    y={y}
+                    width={bar.width}
+                    height={barHeight}
+                    rx={3}
+                    className={task.isCritical ? 'fill-gantt-bar-critical' : 'fill-gantt-bar'}
+                    opacity={0.9}
                   />
-                )}
-              </g>
-            );
-          })}
-        </svg>
+                  {task.progress > 0 && (
+                    <rect
+                      x={bar.startX}
+                      y={y + 2}
+                      width={bar.width * (task.progress / 100)}
+                      height={barHeight - 4}
+                      rx={2}
+                      className={task.isCritical ? 'fill-critical-path' : 'fill-primary'}
+                      opacity={0.5}
+                    />
+                  )}
+                </g>
+              );
+            })}
+          </svg>
 
-        {/* HTML task labels overlay (positioned absolutely so html2canvas renders Arabic correctly) */}
-        {tasks.map((task, i) => {
-          const bar = getTaskBarLayout(task, projectStart, dayWidth);
-          const y = HEADER_HEIGHT + i * rowHeight + barMargin;
-
-          return (
-            <div
-              key={`label-${task.id}`}
-              dir="rtl"
-              className="absolute z-10 whitespace-nowrap text-[10px] font-medium text-muted-foreground pointer-events-none"
-              style={{
-                position: 'absolute',
-                left: `${bar.endX + 15}px`,
-                top: `${y + 2}px`,
-                fontFamily: 'Cairo, sans-serif',
-                letterSpacing: 'normal',
-                wordSpacing: 'normal',
-                lineHeight: `${barHeight}px`,
-              }}
-            >
-              {task.name}
-            </div>
-          );
-        })}
+          <div className="pointer-events-none absolute inset-y-0" style={{ left: chartWidth, width: labelGutterWidth }}>
+            {tasks.map((task, i) => (
+              <div
+                key={`label-${task.id}`}
+                dir="rtl"
+                className="absolute z-10 flex items-center justify-end text-[10px] font-medium text-muted-foreground"
+                style={{
+                  left: LABEL_GAP,
+                  top: HEADER_HEIGHT + i * rowHeight,
+                  width: labelGutterWidth - LABEL_GAP - 10,
+                  height: rowHeight,
+                  paddingInlineStart: '10px',
+                  paddingInlineEnd: '6px',
+                  boxSizing: 'border-box',
+                  textAlign: 'right',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  fontFamily: 'Cairo, sans-serif',
+                  letterSpacing: 'normal',
+                  wordSpacing: 'normal',
+                  unicodeBidi: 'plaintext',
+                }}
+              >
+                {task.name}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
