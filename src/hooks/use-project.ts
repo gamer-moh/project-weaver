@@ -12,6 +12,7 @@ export interface ReportSettings {
   companyName: string;
   reportDate: string;
   logoDataUrl: string | null;
+  ganttSubtitle: string;
 }
 
 const DEFAULT_REPORT_SETTINGS: ReportSettings = {
@@ -22,6 +23,7 @@ const DEFAULT_REPORT_SETTINGS: ReportSettings = {
     day: '2-digit',
   }).format(new Date()),
   logoDataUrl: null,
+  ganttSubtitle: 'الأسهم والمهام مطابقة للعرض داخل التطبيق',
 };
 
 export function useProject() {

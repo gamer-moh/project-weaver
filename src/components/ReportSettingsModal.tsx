@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Building2, Calendar, ImageUp, Trash2, X } from 'lucide-react';
+import { Building2, Calendar, ImageUp, Trash2, Type, X } from 'lucide-react';
 import type { ReportSettings } from '@/hooks/use-project';
 
 interface ReportSettingsModalProps {
@@ -11,6 +11,7 @@ interface ReportSettingsModalProps {
 export function ReportSettingsModal({ settings, onSave, onClose }: ReportSettingsModalProps) {
   const [companyName, setCompanyName] = useState(settings.companyName);
   const [reportDate, setReportDate] = useState(settings.reportDate);
+  const [ganttSubtitle, setGanttSubtitle] = useState(settings.ganttSubtitle ?? '');
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(settings.logoDataUrl);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -29,6 +30,7 @@ export function ReportSettingsModal({ settings, onSave, onClose }: ReportSetting
     onSave({
       companyName: companyName.trim(),
       reportDate: reportDate.trim(),
+      ganttSubtitle: ganttSubtitle.trim(),
       logoDataUrl,
     });
     onClose();
@@ -78,6 +80,20 @@ export function ReportSettingsModal({ settings, onSave, onClose }: ReportSetting
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary"
             />
             <p className="text-[10px] text-muted-foreground">نص حر — اكتب التاريخ أو رقم الإصدار أو الفترة.</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+              <Type className="h-3.5 w-3.5 text-primary" />
+              النص أسفل صفحة Gantt
+            </label>
+            <input
+              value={ganttSubtitle}
+              onChange={(event) => setGanttSubtitle(event.target.value)}
+              placeholder="مثال: الأسهم والمهام مطابقة للعرض داخل التطبيق"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary"
+            />
+            <p className="text-[10px] text-muted-foreground">يظهر أسفل مخطط Gantt في تقرير PDF. اتركه فارغاً للإخفاء.</p>
           </div>
 
           <div className="space-y-1.5">
