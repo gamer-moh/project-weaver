@@ -84,7 +84,19 @@ export function ReportSettingsModal({ settings, onSave, onClose }: ReportSetting
 
           <div className="space-y-1.5">
             <label className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-              <ImageUp className="h-3.5 w-3.5 text-primary" />
+              <Type className="h-3.5 w-3.5 text-primary" />
+              النص أسفل صفحة Gantt
+            </label>
+            <input
+              value={ganttSubtitle}
+              onChange={(event) => setGanttSubtitle(event.target.value)}
+              placeholder="مثال: الأسهم والمهام مطابقة للعرض داخل التطبيق"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary"
+            />
+            <p className="text-[10px] text-muted-foreground">يظهر أسفل مخطط Gantt في تقرير PDF. اتركه فارغاً للإخفاء.</p>
+          </div>
+
+          <div className="space-y-1.5">
               شعار الشركة (اختياري)
             </label>
             <div className="flex items-center gap-3 rounded-md border border-dashed border-border bg-secondary/20 p-3">
