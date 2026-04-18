@@ -5,6 +5,7 @@ import { Toolbar } from '@/components/Toolbar';
 import { TaskTable } from '@/components/TaskTable';
 import { GanttChart } from '@/components/GanttChart';
 import { PdfPreviewModal } from '@/components/PdfPreviewModal';
+import { ReportSettingsModal } from '@/components/ReportSettingsModal';
 
 export const Route = createFileRoute('/')({
   component: App,
@@ -21,6 +22,8 @@ function App() {
     tasks,
     projectName,
     setProjectName,
+    reportSettings,
+    setReportSettings,
     updateTask,
     savePredecessors,
     addTask,
@@ -28,6 +31,7 @@ function App() {
   } = useProject();
 
   const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [showReportSettings, setShowReportSettings] = useState(false);
   const criticalCount = tasks.filter(t => t.isCritical).length;
 
   return (
@@ -37,6 +41,7 @@ function App() {
         onProjectNameChange={setProjectName}
         onAddTask={addTask}
         onExportPdf={() => setShowPdfPreview(true)}
+        onOpenReportSettings={() => setShowReportSettings(true)}
         taskCount={tasks.length}
         criticalCount={criticalCount}
       />
@@ -75,7 +80,17 @@ function App() {
         <PdfPreviewModal
           tasks={tasks}
           projectName={projectName}
+          reportSettings={reportSettings}
+          onOpenSettings={() => setShowReportSettings(true)}
           onClose={() => setShowPdfPreview(false)}
+        />
+      )}
+
+      {showReportSettings && (
+        <ReportSettingsModal
+          settings={reportSettings}
+          onSave={setReportSettings}
+          onClose={() => setShowReportSettings(false)}
         />
       )}
     </div>

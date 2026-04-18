@@ -1,9 +1,10 @@
 import { forwardRef, useCallback, useMemo, useRef, useState } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { FileDown, LoaderCircle, X } from 'lucide-react';
+import { FileDown, LoaderCircle, Settings, X } from 'lucide-react';
 import { Task, addDays, diffDays, formatDate, formatPredecessors } from '@/lib/scheduler';
-import { buildOrthogonalDependencyPath, getDependencyConnection, getTaskBarLayout, wrapTaskName } from '@/lib/gantt';
+import { buildOrthogonalDependencyPath, getDependencyConnection, getTaskBarLayout } from '@/lib/gantt';
+import type { ReportSettings } from '@/hooks/use-project';
 
 type PaperSize = 'a4' | 'a3';
 
@@ -38,8 +39,17 @@ const PDF_COLORS = {
 interface PdfPreviewModalProps {
   tasks: Task[];
   projectName: string;
+  reportSettings: ReportSettings;
+  onOpenSettings: () => void;
   onClose: () => void;
 }
+
+type PageProps = {
+  tasks: Task[];
+  projectName: string;
+  paperSize: PaperSize;
+  reportSettings: ReportSettings;
+};
 
 async function waitForCaptureReady() {
   if (typeof document !== 'undefined' && 'fonts' in document) {
@@ -101,14 +111,47 @@ function getProjectRange(tasks: Task[]) {
   };
 }
 
-const ExportTablePage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName: string; paperSize: PaperSize }>(
-  function ExportTablePage({ tasks, projectName, paperSize }, ref) {
+function ReportHeader({ projectName, reportSettings }: { projectName: string; reportSettings: ReportSettings }) {
+  return (
+    <div
+      style={{
+        background: PDF_COLORS.brand,
+        color: PDF_COLORS.brandText,
+        padding: '20px 28px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 18,
+      }}
+    >
+      <div style={{ fontSize: 14, color: PDF_COLORS.brandSubtle, whiteSpace: 'nowrap' }}>
+        {reportSettings.reportDate || '\u00A0'}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, justifyContent: 'flex-end', textAlign: 'right' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+          <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.2 }}>{projectName}</div>
+          {reportSettings.companyName && (
+            <div style={{ fontSize: 14, color: PDF_COLORS.brandSubtle, fontWeight: 500 }}>
+              {reportSettings.companyName}
+            </div>
+          )}
+        </div>
+        {reportSettings.logoDataUrl && (
+          <img
+            src={reportSettings.logoDataUrl}
+            alt=""
+            crossOrigin="anonymous"
+            style={{ height: 56, width: 56, objectFit: 'contain', background: '#ffffff', borderRadius: 8, padding: 4 }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+const ExportTablePage = forwardRef<HTMLDivElement, PageProps>(
+  function ExportTablePage({ tasks, projectName, paperSize, reportSettings }, ref) {
     const spec = PAPER_SPECS[paperSize];
-    const reportDate = new Intl.DateTimeFormat('ar-SA', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date());
     const taskIds = tasks.map((task) => task.id);
 
     return (
@@ -136,19 +179,7 @@ const ExportTablePage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName:
             flexDirection: 'column',
           }}
         >
-          <div
-            style={{
-              background: PDF_COLORS.brand,
-              color: PDF_COLORS.brandText,
-              padding: '20px 28px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <div style={{ fontSize: 14, color: PDF_COLORS.brandSubtle }}>8:00 | {reportDate}</div>
-            <div style={{ fontSize: 26, fontWeight: 700 }}>{projectName}</div>
-          </div>
+          <ReportHeader projectName={projectName} reportSettings={reportSettings} />
 
           <div style={{ padding: '18px 24px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 14, color: PDF_COLORS.muted }}>إجمالي المهام: {tasks.length}</div>
@@ -206,8 +237,8 @@ const ExportTablePage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName:
   },
 );
 
-const ExportGanttPage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName: string; paperSize: PaperSize }>(
-  function ExportGanttPage({ tasks, projectName, paperSize }, ref) {
+const ExportGanttPage = forwardRef<HTMLDivElement, PageProps>(
+  function ExportGanttPage({ tasks, projectName, paperSize, reportSettings }, ref) {
     const spec = PAPER_SPECS[paperSize];
     const { projectStart, projectEnd } = useMemo(() => getProjectRange(tasks), [tasks]);
     const totalDays = diffDays(projectEnd, projectStart) + 1;
@@ -276,19 +307,7 @@ const ExportGanttPage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName:
             flexDirection: 'column',
           }}
         >
-          <div
-            style={{
-              background: PDF_COLORS.brand,
-              color: PDF_COLORS.brandText,
-              padding: '20px 28px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <div style={{ fontSize: 14, color: PDF_COLORS.brandSubtle }}>مخطط غانت التنفيذي</div>
-            <div style={{ fontSize: 24, fontWeight: 700 }}>{projectName}</div>
-          </div>
+          <ReportHeader projectName={projectName} reportSettings={reportSettings} />
 
           <div style={{ padding: '22px 24px 18px', flex: 1 }}>
             <div style={{ display: 'grid', gridTemplateColumns: `1fr ${labelWidth}px`, gap: 18, height: '100%' }}>
@@ -398,7 +417,7 @@ const ExportGanttPage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName:
   },
 );
 
-export function PdfPreviewModal({ tasks, projectName, onClose }: PdfPreviewModalProps) {
+export function PdfPreviewModal({ tasks, projectName, reportSettings, onOpenSettings, onClose }: PdfPreviewModalProps) {
   const [paperSize, setPaperSize] = useState<PaperSize>('a3');
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -454,14 +473,24 @@ export function PdfPreviewModal({ tasks, projectName, onClose }: PdfPreviewModal
               ))}
             </div>
 
-            <button
-              onClick={handleDownload}
-              disabled={isExporting}
-              className="flex items-center gap-1.5 rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-60"
-            >
-              {isExporting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
-              تنزيل PDF
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onOpenSettings}
+                className="flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
+                title="تعديل اسم الشركة، الشعار، والتاريخ"
+              >
+                <Settings className="h-3.5 w-3.5" />
+                إعدادات الترويسة
+              </button>
+              <button
+                onClick={handleDownload}
+                disabled={isExporting}
+                className="flex items-center gap-1.5 rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-60"
+              >
+                {isExporting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+                تنزيل PDF
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-auto bg-muted/30 p-5">
@@ -480,9 +509,9 @@ export function PdfPreviewModal({ tasks, projectName, onClose }: PdfPreviewModal
                 >
                   <div style={{ width: spec.widthPx, height: spec.heightPx, transform: `scale(${previewScale})`, transformOrigin: 'top right' }}>
                     {pageIndex === 0 ? (
-                      <ExportTablePage tasks={tasks} projectName={projectName} paperSize={paperSize} />
+                      <ExportTablePage tasks={tasks} projectName={projectName} paperSize={paperSize} reportSettings={reportSettings} />
                     ) : (
-                      <ExportGanttPage tasks={tasks} projectName={projectName} paperSize={paperSize} />
+                      <ExportGanttPage tasks={tasks} projectName={projectName} paperSize={paperSize} reportSettings={reportSettings} />
                     )}
                   </div>
                 </div>
@@ -502,9 +531,9 @@ export function PdfPreviewModal({ tasks, projectName, onClose }: PdfPreviewModal
           pointerEvents: 'none',
         }}
       >
-        <ExportTablePage ref={captureTableRef} tasks={tasks} projectName={projectName} paperSize={paperSize} />
+        <ExportTablePage ref={captureTableRef} tasks={tasks} projectName={projectName} paperSize={paperSize} reportSettings={reportSettings} />
         <div style={{ height: 40 }} />
-        <ExportGanttPage ref={captureGanttRef} tasks={tasks} projectName={projectName} paperSize={paperSize} />
+        <ExportGanttPage ref={captureGanttRef} tasks={tasks} projectName={projectName} paperSize={paperSize} reportSettings={reportSettings} />
       </div>
     </>
   );

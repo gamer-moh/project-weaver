@@ -1,10 +1,11 @@
-import { FileDown, Plus, BarChart3 } from 'lucide-react';
+import { FileDown, Plus, BarChart3, Settings } from 'lucide-react';
 
 interface ToolbarProps {
   projectName: string;
   onProjectNameChange: (name: string) => void;
   onAddTask: () => void;
   onExportPdf: () => void;
+  onOpenReportSettings: () => void;
   taskCount: number;
   criticalCount: number;
 }
@@ -14,6 +15,7 @@ export function Toolbar({
   onProjectNameChange,
   onAddTask,
   onExportPdf,
+  onOpenReportSettings,
   taskCount,
   criticalCount,
 }: ToolbarProps) {
@@ -41,6 +43,14 @@ export function Toolbar({
         >
           <Plus className="w-3.5 h-3.5" />
           إضافة مهمة
+        </button>
+        <button
+          onClick={onOpenReportSettings}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-md transition-colors"
+          title="إعدادات تقرير PDF"
+        >
+          <Settings className="w-3.5 h-3.5" />
+          إعدادات التقرير
         </button>
         <button
           onClick={onExportPdf}
