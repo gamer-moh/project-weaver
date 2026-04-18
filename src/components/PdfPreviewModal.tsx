@@ -111,14 +111,47 @@ function getProjectRange(tasks: Task[]) {
   };
 }
 
-const ExportTablePage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName: string; paperSize: PaperSize }>(
-  function ExportTablePage({ tasks, projectName, paperSize }, ref) {
+function ReportHeader({ projectName, reportSettings }: { projectName: string; reportSettings: ReportSettings }) {
+  return (
+    <div
+      style={{
+        background: PDF_COLORS.brand,
+        color: PDF_COLORS.brandText,
+        padding: '20px 28px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 18,
+      }}
+    >
+      <div style={{ fontSize: 14, color: PDF_COLORS.brandSubtle, whiteSpace: 'nowrap' }}>
+        {reportSettings.reportDate || '\u00A0'}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, justifyContent: 'flex-end', textAlign: 'right' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+          <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.2 }}>{projectName}</div>
+          {reportSettings.companyName && (
+            <div style={{ fontSize: 14, color: PDF_COLORS.brandSubtle, fontWeight: 500 }}>
+              {reportSettings.companyName}
+            </div>
+          )}
+        </div>
+        {reportSettings.logoDataUrl && (
+          <img
+            src={reportSettings.logoDataUrl}
+            alt=""
+            crossOrigin="anonymous"
+            style={{ height: 56, width: 56, objectFit: 'contain', background: '#ffffff', borderRadius: 8, padding: 4 }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+const ExportTablePage = forwardRef<HTMLDivElement, PageProps>(
+  function ExportTablePage({ tasks, projectName, paperSize, reportSettings }, ref) {
     const spec = PAPER_SPECS[paperSize];
-    const reportDate = new Intl.DateTimeFormat('ar-SA', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date());
     const taskIds = tasks.map((task) => task.id);
 
     return (
@@ -146,19 +179,7 @@ const ExportTablePage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName:
             flexDirection: 'column',
           }}
         >
-          <div
-            style={{
-              background: PDF_COLORS.brand,
-              color: PDF_COLORS.brandText,
-              padding: '20px 28px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <div style={{ fontSize: 14, color: PDF_COLORS.brandSubtle }}>8:00 | {reportDate}</div>
-            <div style={{ fontSize: 26, fontWeight: 700 }}>{projectName}</div>
-          </div>
+          <ReportHeader projectName={projectName} reportSettings={reportSettings} />
 
           <div style={{ padding: '18px 24px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 14, color: PDF_COLORS.muted }}>إجمالي المهام: {tasks.length}</div>
