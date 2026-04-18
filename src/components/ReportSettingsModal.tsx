@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Building2, Calendar, ImageUp, Trash2, X } from 'lucide-react';
+import { Building2, Calendar, ImageUp, Trash2, Type, X } from 'lucide-react';
 import type { ReportSettings } from '@/hooks/use-project';
 
 interface ReportSettingsModalProps {
@@ -11,6 +11,7 @@ interface ReportSettingsModalProps {
 export function ReportSettingsModal({ settings, onSave, onClose }: ReportSettingsModalProps) {
   const [companyName, setCompanyName] = useState(settings.companyName);
   const [reportDate, setReportDate] = useState(settings.reportDate);
+  const [ganttSubtitle, setGanttSubtitle] = useState(settings.ganttSubtitle ?? '');
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(settings.logoDataUrl);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -29,6 +30,7 @@ export function ReportSettingsModal({ settings, onSave, onClose }: ReportSetting
     onSave({
       companyName: companyName.trim(),
       reportDate: reportDate.trim(),
+      ganttSubtitle: ganttSubtitle.trim(),
       logoDataUrl,
     });
     onClose();
