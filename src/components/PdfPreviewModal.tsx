@@ -42,7 +42,7 @@ const PDF_COLORS = {
   today: '#16a34a',
 };
 
-const PDF_FONT_FAMILY = 'Cairo, sans-serif';
+const PDF_FONT_FAMILY = "'Cairo', 'Segoe UI', 'Tahoma', 'Arial', sans-serif";
 const EMBEDDED_CAIRO = CAIRO_FONT_BASE64.replace(/\s+/g, '');
 
 interface PdfPreviewModalProps {
@@ -81,6 +81,11 @@ function sanitizeExportTree(node: Element) {
     style.animation = 'none';
     style.backgroundImage = 'none';
     style.fontFamily = PDF_FONT_FAMILY;
+    // Reset spacing — Tailwind / inherited tracking can collapse Arabic spaces
+    style.letterSpacing = 'normal';
+    style.wordSpacing = 'normal';
+    style.setProperty('white-space', 'normal');
+    style.setProperty('unicode-bidi', 'isolate');
 
     const colorProps = ['color', 'background-color', 'border-color', 'fill', 'stroke'];
     for (const prop of colorProps) {
