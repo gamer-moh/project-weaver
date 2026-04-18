@@ -97,6 +97,8 @@ export function ReportSettingsModal({ settings, onSave, onClose }: ReportSetting
           </div>
 
           <div className="space-y-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+              <ImageUp className="h-3.5 w-3.5 text-primary" />
               شعار الشركة (اختياري)
             </label>
             <div className="flex items-center gap-3 rounded-md border border-dashed border-border bg-secondary/20 p-3">
