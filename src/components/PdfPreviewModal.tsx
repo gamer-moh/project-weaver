@@ -237,8 +237,8 @@ const ExportTablePage = forwardRef<HTMLDivElement, PageProps>(
   },
 );
 
-const ExportGanttPage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName: string; paperSize: PaperSize }>(
-  function ExportGanttPage({ tasks, projectName, paperSize }, ref) {
+const ExportGanttPage = forwardRef<HTMLDivElement, PageProps>(
+  function ExportGanttPage({ tasks, projectName, paperSize, reportSettings }, ref) {
     const spec = PAPER_SPECS[paperSize];
     const { projectStart, projectEnd } = useMemo(() => getProjectRange(tasks), [tasks]);
     const totalDays = diffDays(projectEnd, projectStart) + 1;
@@ -307,19 +307,7 @@ const ExportGanttPage = forwardRef<HTMLDivElement, { tasks: Task[]; projectName:
             flexDirection: 'column',
           }}
         >
-          <div
-            style={{
-              background: PDF_COLORS.brand,
-              color: PDF_COLORS.brandText,
-              padding: '20px 28px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <div style={{ fontSize: 14, color: PDF_COLORS.brandSubtle }}>مخطط غانت التنفيذي</div>
-            <div style={{ fontSize: 24, fontWeight: 700 }}>{projectName}</div>
-          </div>
+          <ReportHeader projectName={projectName} reportSettings={reportSettings} />
 
           <div style={{ padding: '22px 24px 18px', flex: 1 }}>
             <div style={{ display: 'grid', gridTemplateColumns: `1fr ${labelWidth}px`, gap: 18, height: '100%' }}>
