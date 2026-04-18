@@ -63,10 +63,10 @@ async function waitForCaptureReady() {
 async function captureElement(element: HTMLElement, widthPx: number, heightPx: number) {
   const canvas = await html2canvas(element, {
     backgroundColor: PDF_COLORS.page,
-    scale: Math.max(2, window.devicePixelRatio * 1.5),
+    scale: 2,
     useCORS: true,
+    allowTaint: true,
     logging: false,
-    foreignObjectRendering: true,
     width: widthPx,
     height: heightPx,
     windowWidth: widthPx,
