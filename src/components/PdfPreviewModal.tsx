@@ -82,11 +82,11 @@ function sanitizeExportTree(node: Element) {
     style.backgroundImage = 'none';
     style.fontFamily = PDF_FONT_FAMILY;
 
-    const colorProps = ['color', 'backgroundColor', 'borderColor', 'fill', 'stroke'] as const;
+    const colorProps = ['color', 'background-color', 'border-color', 'fill', 'stroke'];
     for (const prop of colorProps) {
-      const value = style[prop as keyof CSSStyleDeclaration];
-      if (typeof value === 'string' && /(oklch|color-mix|var\()/i.test(value)) {
-        style[prop as keyof CSSStyleDeclaration] = '';
+      const value = style.getPropertyValue(prop);
+      if (value && /(oklch|color-mix|var\()/i.test(value)) {
+        style.removeProperty(prop);
       }
     }
   }
