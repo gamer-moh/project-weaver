@@ -147,6 +147,7 @@ export function GanttChart({ tasks }: GanttChartProps) {
 
       {/* Chart */}
       <div className="flex-1 overflow-auto bg-card [transform-origin:left_top]" dir="ltr">
+        <div className="relative" style={{ width: chartWidth, height: Math.max(chartHeight, 300) }}>
         <svg width={chartWidth} height={Math.max(chartHeight, 300)} className="min-w-full origin-top-left overflow-visible">
           <defs>
             <marker id="arrow-norm" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse">
@@ -210,7 +211,6 @@ export function GanttChart({ tasks }: GanttChartProps) {
           {tasks.map((task, i) => {
             const bar = getTaskBarLayout(task, projectStart, dayWidth);
             const y = HEADER_HEIGHT + i * rowHeight + barMargin;
-            const labelLines = wrapTaskName(task.name, Math.max(8, Math.floor(dayWidth * 0.65)), 3);
 
             return (
               <g key={task.id}>
@@ -227,21 +227,36 @@ export function GanttChart({ tasks }: GanttChartProps) {
                     rx={2} className={task.isCritical ? 'fill-critical-path' : 'fill-primary'} opacity={0.5}
                   />
                 )}
-                {labelLines.map((line, lineIndex) => (
-                  <text
-                    key={`${task.id}-${lineIndex}`}
-                    x={bar.endX + 10}
-                    y={y + 10 + lineIndex * 10}
-                    className="fill-muted-foreground text-[9px] font-medium"
-                    style={{ fontFamily: 'Cairo, sans-serif' }}
-                  >
-                    {line}
-                  </text>
-                ))}
               </g>
             );
           })}
         </svg>
+
+        {/* HTML task labels overlay (positioned absolutely so html2canvas renders Arabic correctly) */}
+        {tasks.map((task, i) => {
+          const bar = getTaskBarLayout(task, projectStart, dayWidth);
+          const y = HEADER_HEIGHT + i * rowHeight + barMargin;
+          return (
+            <div
+              key={`label-${task.id}`}
+              dir="rtl"
+              className="absolute text-[10px] font-medium text-muted-foreground pointer-events-none"
+              style={{
+                left: bar.endX + 10,
+                top: y,
+                height: barHeight,
+                lineHeight: `${barHeight}px`,
+                whiteSpace: 'nowrap',
+                fontFamily: 'Cairo, sans-serif',
+                letterSpacing: 'normal',
+                wordSpacing: 'normal',
+              }}
+            >
+              {task.name}
+            </div>
+          );
+        })}
+        </div>
       </div>
     </div>
   );
