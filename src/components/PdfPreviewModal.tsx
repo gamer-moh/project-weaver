@@ -73,6 +73,30 @@ async function captureElement(element: HTMLElement, widthPx: number, heightPx: n
     windowHeight: heightPx,
     scrollX: 0,
     scrollY: 0,
+    onclone: (clonedDocument) => {
+      clonedDocument.documentElement.style.background = PDF_COLORS.page;
+      clonedDocument.documentElement.style.color = PDF_COLORS.ink;
+      clonedDocument.body.style.margin = '0';
+      clonedDocument.body.style.background = PDF_COLORS.page;
+      clonedDocument.body.style.color = PDF_COLORS.ink;
+
+      const isolateRoot = clonedDocument.querySelector('[data-pdf-isolate-root]') as HTMLElement | null;
+      if (isolateRoot) {
+        Array.from(clonedDocument.body.children).forEach((child) => {
+          if (child !== isolateRoot) child.remove();
+        });
+
+        isolateRoot.style.all = 'initial';
+        isolateRoot.style.display = 'block';
+        isolateRoot.style.position = 'static';
+        isolateRoot.style.width = `${widthPx}px`;
+        isolateRoot.style.background = PDF_COLORS.page;
+        isolateRoot.style.color = PDF_COLORS.ink;
+        isolateRoot.style.fontFamily = 'Cairo, sans-serif';
+        isolateRoot.style.direction = 'rtl';
+        isolateRoot.style.boxSizing = 'border-box';
+      }
+    },
   });
 
   return canvas.toDataURL('image/png');
@@ -532,16 +556,23 @@ export function PdfPreviewModal({ tasks, projectName, reportSettings, onOpenSett
 
       <div
         aria-hidden="true"
+        data-pdf-isolate-root
         style={{
           position: 'fixed',
           top: 0,
-          left: 'calc(100vw + 32px)',
+          left: '-100000px',
           width: spec.widthPx,
           pointerEvents: 'none',
+          background: PDF_COLORS.page,
+          color: PDF_COLORS.ink,
+          fontFamily: 'Cairo, sans-serif',
+          direction: 'rtl',
+          isolation: 'isolate',
+          boxSizing: 'border-box',
         }}
       >
         <ExportTablePage ref={captureTableRef} tasks={tasks} projectName={projectName} paperSize={paperSize} reportSettings={reportSettings} />
-        <div style={{ height: 40 }} />
+        <div style={{ height: 40, background: PDF_COLORS.page }} />
         <ExportGanttPage ref={captureGanttRef} tasks={tasks} projectName={projectName} paperSize={paperSize} reportSettings={reportSettings} />
       </div>
     </>
