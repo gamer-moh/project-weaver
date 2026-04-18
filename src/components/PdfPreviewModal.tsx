@@ -417,7 +417,7 @@ const ExportGanttPage = forwardRef<HTMLDivElement, PageProps>(
   },
 );
 
-export function PdfPreviewModal({ tasks, projectName, onClose }: PdfPreviewModalProps) {
+export function PdfPreviewModal({ tasks, projectName, reportSettings, onOpenSettings, onClose }: PdfPreviewModalProps) {
   const [paperSize, setPaperSize] = useState<PaperSize>('a3');
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -473,14 +473,24 @@ export function PdfPreviewModal({ tasks, projectName, onClose }: PdfPreviewModal
               ))}
             </div>
 
-            <button
-              onClick={handleDownload}
-              disabled={isExporting}
-              className="flex items-center gap-1.5 rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-60"
-            >
-              {isExporting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
-              تنزيل PDF
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onOpenSettings}
+                className="flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
+                title="تعديل اسم الشركة، الشعار، والتاريخ"
+              >
+                <Settings className="h-3.5 w-3.5" />
+                إعدادات الترويسة
+              </button>
+              <button
+                onClick={handleDownload}
+                disabled={isExporting}
+                className="flex items-center gap-1.5 rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-60"
+              >
+                {isExporting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+                تنزيل PDF
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-auto bg-muted/30 p-5">
@@ -499,9 +509,9 @@ export function PdfPreviewModal({ tasks, projectName, onClose }: PdfPreviewModal
                 >
                   <div style={{ width: spec.widthPx, height: spec.heightPx, transform: `scale(${previewScale})`, transformOrigin: 'top right' }}>
                     {pageIndex === 0 ? (
-                      <ExportTablePage tasks={tasks} projectName={projectName} paperSize={paperSize} />
+                      <ExportTablePage tasks={tasks} projectName={projectName} paperSize={paperSize} reportSettings={reportSettings} />
                     ) : (
-                      <ExportGanttPage tasks={tasks} projectName={projectName} paperSize={paperSize} />
+                      <ExportGanttPage tasks={tasks} projectName={projectName} paperSize={paperSize} reportSettings={reportSettings} />
                     )}
                   </div>
                 </div>
@@ -521,9 +531,9 @@ export function PdfPreviewModal({ tasks, projectName, onClose }: PdfPreviewModal
           pointerEvents: 'none',
         }}
       >
-        <ExportTablePage ref={captureTableRef} tasks={tasks} projectName={projectName} paperSize={paperSize} />
+        <ExportTablePage ref={captureTableRef} tasks={tasks} projectName={projectName} paperSize={paperSize} reportSettings={reportSettings} />
         <div style={{ height: 40 }} />
-        <ExportGanttPage ref={captureGanttRef} tasks={tasks} projectName={projectName} paperSize={paperSize} />
+        <ExportGanttPage ref={captureGanttRef} tasks={tasks} projectName={projectName} paperSize={paperSize} reportSettings={reportSettings} />
       </div>
     </>
   );
