@@ -398,7 +398,10 @@ const ExportGanttPage = forwardRef<HTMLDivElement, PageProps>(
                       gap: 10,
                     }}
                   >
-                    <span style={{ fontSize: 12, color: PDF_COLORS.muted }} dir="ltr">{formatDate(task.startDate)}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, minWidth: 92 }} dir="ltr">
+                      <span style={{ fontSize: 11, color: PDF_COLORS.muted, fontWeight: 600 }}>{formatDate(task.startDate)}</span>
+                      <span style={{ fontSize: 10, color: PDF_COLORS.muted, opacity: 0.75 }}>← {formatDate(task.endDate)}</span>
+                    </div>
                     <span style={{ fontSize: 13, fontWeight: 700, color: task.isCritical ? PDF_COLORS.criticalFill : PDF_COLORS.ink, flex: 1, textAlign: 'right', whiteSpace: 'normal', lineHeight: 1.4, wordBreak: 'break-word' }}>
                       {task.name}
                     </span>
