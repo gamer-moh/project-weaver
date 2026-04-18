@@ -67,22 +67,19 @@ export function buildOrthogonalDependencyPath(
   successorIndex = 0,
 ) {
   if (fromSide === 'right' && toSide === 'left') {
-    const outX = fromX + 15 + successorIndex * 6;
+    const outX = fromX + 85 + successorIndex * 10;
 
-    // Normal forward link
     if (outX < toX - 15) {
       return `M ${fromX} ${fromY} L ${outX} ${fromY} L ${outX} ${toY} L ${toX} ${toY}`;
     }
 
-    // Backward / overlap — drop strictly below predecessor bar to clear its bounding box
     const safeDropY = fromY + 22 + successorIndex * 4;
     const safeLeftX = toX - 15 - successorIndex * 4;
 
     return `M ${fromX} ${fromY} L ${outX} ${fromY} L ${outX} ${safeDropY} L ${safeLeftX} ${safeDropY} L ${safeLeftX} ${toY} L ${toX} ${toY}`;
   }
 
-  // Fallback for SS / FF / SF
-  const outX = fromSide === 'left' ? fromX - 15 - successorIndex * 6 : fromX + 15 + successorIndex * 6;
+  const outX = fromSide === 'left' ? fromX - 85 - successorIndex * 10 : fromX + 85 + successorIndex * 10;
   const entryX = toSide === 'left' ? toX - 15 - successorIndex * 4 : toX + 15 + successorIndex * 4;
   const safeDropY = fromY + 22 + successorIndex * 4;
 
