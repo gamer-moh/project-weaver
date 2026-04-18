@@ -1,9 +1,10 @@
 import { forwardRef, useCallback, useMemo, useRef, useState } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { FileDown, LoaderCircle, X } from 'lucide-react';
+import { FileDown, LoaderCircle, Settings, X } from 'lucide-react';
 import { Task, addDays, diffDays, formatDate, formatPredecessors } from '@/lib/scheduler';
-import { buildOrthogonalDependencyPath, getDependencyConnection, getTaskBarLayout, wrapTaskName } from '@/lib/gantt';
+import { buildOrthogonalDependencyPath, getDependencyConnection, getTaskBarLayout } from '@/lib/gantt';
+import type { ReportSettings } from '@/hooks/use-project';
 
 type PaperSize = 'a4' | 'a3';
 
@@ -38,8 +39,17 @@ const PDF_COLORS = {
 interface PdfPreviewModalProps {
   tasks: Task[];
   projectName: string;
+  reportSettings: ReportSettings;
+  onOpenSettings: () => void;
   onClose: () => void;
 }
+
+type PageProps = {
+  tasks: Task[];
+  projectName: string;
+  paperSize: PaperSize;
+  reportSettings: ReportSettings;
+};
 
 async function waitForCaptureReady() {
   if (typeof document !== 'undefined' && 'fonts' in document) {
