@@ -69,7 +69,7 @@ export function TaskTable({
     return (
       <div
         onDoubleClick={() => startEdit(cellId, value)}
-        className="cursor-text truncate px-2 py-1.5 text-xs hover:bg-secondary/50 rounded-sm transition-colors"
+        className="cursor-text px-2 py-1.5 text-xs hover:bg-secondary/50 rounded-sm transition-colors whitespace-normal break-words leading-5"
         title={value}
       >
         {value || '\u00A0'}
@@ -104,9 +104,9 @@ export function TaskTable({
           >
             <div className="px-2 py-1 text-xs text-muted-foreground">{idx + 1}</div>
             <div className="px-2 py-1 text-xs text-muted-foreground">{task.wbs}</div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-start gap-1 py-1">
               {task.isCritical && (
-                <span className="w-1.5 h-1.5 rounded-full bg-critical-path flex-shrink-0" />
+                <span className="mt-2 w-1.5 h-1.5 rounded-full bg-critical-path flex-shrink-0" />
               )}
               {renderCell(task.id, 'name', task.name)}
             </div>
