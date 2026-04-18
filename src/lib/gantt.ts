@@ -64,26 +64,31 @@ export function buildOrthogonalDependencyPath(
   fromSide: ConnectionSide,
   toSide: ConnectionSide,
   _rowHeight: number,
-  _laneIndex = 0,
+  successorIndex = 0,
 ) {
   const STUB = 15;
+  const STAGGER = successorIndex * 4;
 
   // Strict Primavera P6-style FS pathfinding (right -> left)
   if (fromSide === 'right' && toSide === 'left') {
-    const exitX = fromX + STUB;
-    const entryX = toX - STUB;
+    const gap = toX - fromX;
 
-    // Scenario A: Normal forward dependency — target starts after predecessor ends + stub
-    if (entryX >= exitX) {
+    // Scenario A: Forward dependency (target starts at/after predecessor ends)
+    if (gap >= 0) {
+      // Smart dynamic offset: never draw past target if they are close
+      const baseDrop = gap > 20 ? fromX + STUB : fromX + Math.max(gap / 2, 5);
+      const dropX = baseDrop + STAGGER;
       return [
         `M${fromX},${fromY}`,
-        `L${exitX},${fromY}`,
-        `L${exitX},${toY}`,
+        `L${dropX},${fromY}`,
+        `L${dropX},${toY}`,
         `L${toX},${toY}`,
       ].join(' ');
     }
 
     // Scenario B: Backward/overlap — route around bars via midpoint between rows
+    const exitX = fromX + STUB + STAGGER;
+    const entryX = toX - STUB - STAGGER;
     const midY = (fromY + toY) / 2;
     return [
       `M${fromX},${fromY}`,
@@ -96,8 +101,8 @@ export function buildOrthogonalDependencyPath(
   }
 
   // Fallback for SS / FF / SF
-  const exitX = fromSide === 'left' ? fromX - STUB : fromX + STUB;
-  const entryX = toSide === 'left' ? toX - STUB : toX + STUB;
+  const exitX = fromSide === 'left' ? fromX - STUB - STAGGER : fromX + STUB + STAGGER;
+  const entryX = toSide === 'left' ? toX - STUB - STAGGER : toX + STUB + STAGGER;
   const midY = (fromY + toY) / 2;
 
   return [
