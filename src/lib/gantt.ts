@@ -89,14 +89,6 @@ export function buildOrthogonalDependencyPath(
   return `M ${fromX} ${fromY} L ${outX} ${fromY} L ${outX} ${safeDropY} L ${entryX} ${safeDropY} L ${entryX} ${toY} L ${toX} ${toY}`;
 }
 
-  const branchOffset = 12 + successorIndex * 8;
-  const exitX = fromSide === 'left' ? fromX - branchOffset : fromX + branchOffset;
-  const entryX = toSide === 'left' ? toX - 15 - successorIndex * 5 : toX + 15 + successorIndex * 5;
-  const midY = fromY + (toY - fromY) / 2;
-
-  return `M ${fromX} ${fromY} L ${exitX} ${fromY} L ${exitX} ${midY} L ${entryX} ${midY} L ${entryX} ${toY} L ${toX} ${toY}`;
-}
-
 export function wrapTaskName(name: string, maxCharsPerLine: number, maxLines: number) {
   const words = name.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return [''];
