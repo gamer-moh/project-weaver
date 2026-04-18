@@ -246,9 +246,23 @@ function ReportHeader({ projectName, reportSettings }: { projectName: string; re
       <div style={{ fontSize: 14, color: PDF_COLORS.brandSubtle, whiteSpace: 'nowrap' }}>
         {reportSettings.reportDate || '\u00A0'}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, justifyContent: 'flex-end', textAlign: 'right' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-          <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.2 }}>{projectName}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, justifyContent: 'flex-end', textAlign: 'right', minWidth: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, minWidth: 0, flex: 1 }}>
+          <div
+            style={{
+              fontSize: 24,
+              fontWeight: 700,
+              lineHeight: 1.3,
+              letterSpacing: 0,
+              wordSpacing: '0.15em',
+              whiteSpace: 'normal',
+              wordBreak: 'normal',
+              overflowWrap: 'break-word',
+              maxWidth: '100%',
+            }}
+          >
+            {projectName}
+          </div>
           {reportSettings.companyName && (
             <div style={{ fontSize: 14, color: PDF_COLORS.brandSubtle, fontWeight: 500 }}>
               {reportSettings.companyName}
@@ -530,9 +544,11 @@ const ExportGanttPage = forwardRef<HTMLDivElement, PageProps>(
             </div>
           </div>
 
-          <div style={{ padding: '12px 24px', fontSize: 12, color: PDF_COLORS.muted, textAlign: 'center' }}>
-            LTR Gantt Preview — الأسهم والمهام مطابقة للعرض داخل التطبيق
-          </div>
+          {reportSettings.ganttSubtitle && (
+            <div style={{ padding: '12px 24px', fontSize: 12, color: PDF_COLORS.muted, textAlign: 'center' }}>
+              {reportSettings.ganttSubtitle}
+            </div>
+          )}
         </div>
       </div>
     );
