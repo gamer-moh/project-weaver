@@ -42,7 +42,7 @@ const PDF_COLORS = {
   today: '#16a34a',
 };
 
-const PDF_FONT_FAMILY = 'Cairo, sans-serif';
+const PDF_FONT_FAMILY = "'Cairo', 'Segoe UI', 'Tahoma', 'Arial', sans-serif";
 const EMBEDDED_CAIRO = CAIRO_FONT_BASE64.replace(/\s+/g, '');
 
 interface PdfPreviewModalProps {
@@ -81,6 +81,11 @@ function sanitizeExportTree(node: Element) {
     style.animation = 'none';
     style.backgroundImage = 'none';
     style.fontFamily = PDF_FONT_FAMILY;
+    // Reset spacing — Tailwind / inherited tracking can collapse Arabic spaces
+    style.letterSpacing = 'normal';
+    style.wordSpacing = 'normal';
+    style.setProperty('white-space', 'normal');
+    style.setProperty('unicode-bidi', 'isolate');
 
     const colorProps = ['color', 'background-color', 'border-color', 'fill', 'stroke'];
     for (const prop of colorProps) {
@@ -128,6 +133,11 @@ async function createExportTemplate(element: HTMLElement, widthPx: number, heigh
       background: ${PDF_COLORS.page};
       color: ${PDF_COLORS.ink};
       font-family: ${PDF_FONT_FAMILY};
+      letter-spacing: normal;
+      word-spacing: normal;
+      direction: rtl;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
     }
     * {
       box-shadow: none !important;
@@ -136,6 +146,10 @@ async function createExportTemplate(element: HTMLElement, widthPx: number, heigh
       transition: none !important;
       animation: none !important;
       background-image: none !important;
+      letter-spacing: normal !important;
+      word-spacing: normal !important;
+      font-feature-settings: normal !important;
+      font-variant-ligatures: normal !important;
     }
   </style></head><body></body></html>`);
   doc.close();
@@ -196,7 +210,6 @@ function buildPdfFromImages(images: string[], paperSize: PaperSize, fileName: st
     doc.addFileToVFS('Cairo-Regular.ttf', EMBEDDED_CAIRO);
     doc.addFont('Cairo-Regular.ttf', 'Cairo', 'normal');
     doc.setFont('Cairo', 'normal');
-    doc.setR2L?.(true);
   }
 
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -252,9 +265,9 @@ function ReportHeader({ projectName, reportSettings }: { projectName: string; re
             style={{
               fontSize: 24,
               fontWeight: 700,
-              lineHeight: 1.3,
-              letterSpacing: 0,
-              wordSpacing: '0.15em',
+              lineHeight: 1.4,
+              letterSpacing: 'normal',
+              wordSpacing: 'normal',
               whiteSpace: 'normal',
               wordBreak: 'normal',
               overflowWrap: 'break-word',
